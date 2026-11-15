@@ -6,6 +6,7 @@ export type AudioSettings = {
   effects: number;
   voice: number;
   spoken: boolean;
+  typing: boolean;
 };
 const defaults: AudioSettings = {
   master: 0.65,
@@ -14,6 +15,7 @@ const defaults: AudioSettings = {
   effects: 0.65,
   voice: 0.8,
   spoken: false,
+  typing: true,
 };
 let saved: any = {};
 try {
@@ -24,6 +26,9 @@ for (const key of ["master", "music", "ambience", "effects", "voice"] as const)
   if (typeof saved[key] === "number")
     levels[key] = Math.max(0, Math.min(1, saved[key]));
 levels.spoken = saved.spoken === true;
+levels.typing = saved.typing !== false;
+const typingSources = new Set<AudioScheduledSourceNode>();
+let typingBus: GainNode | undefined;
 let ctx: AudioContext | undefined,
   master: GainNode,
   buses: Record<Channel, GainNode>,
@@ -53,6 +58,7 @@ function volume() {
       ctx.currentTime,
       0.15,
     );
+  typingBus?.gain.setTargetAtTime(ducked ? 0.45 : 1, ctx.currentTime, 0.03);
   if (voiceEl) voiceEl.volume = levels.master * levels.voice;
 }
 export function setLevel(key: keyof AudioSettings, value: number | boolean) {
@@ -62,6 +68,7 @@ export function setLevel(key: keyof AudioSettings, value: number | boolean) {
   } catch {}
   volume();
   if (key === "spoken" && !value) stopVoice();
+  if (key === "typing" && !value) stopTypingSound();
 }
 export async function unlock() {
   try {
@@ -78,6 +85,8 @@ export async function unlock() {
         buses[k] = ctx.createGain();
         buses[k].connect(master);
       }
+      typingBus = ctx.createGain();
+      typingBus.connect(buses.effects);
       noise = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate);
       const a = noise.getChannelData(0);
       let seed = 707;
@@ -147,6 +156,81 @@ function hiss(
     f.disconnect();
     g.disconnect();
   };
+}
+/** Short character voices and paper texture, routed through the existing SFX mixer. */
+export function typingSound(who: string, narration = false) {
+  if (
+    !levels.typing ||
+    hidden ||
+    !ctx ||
+    ctx.state !== "running" ||
+    !typingBus ||
+    typingSources.size >= 4
+  )
+    return;
+  const t = ctx.currentTime;
+  const gain = ctx.createGain();
+  let source: AudioScheduledSourceNode;
+  let filter: BiquadFilterNode | undefined;
+  const duration = narration ? 0.13 : 0.028;
+  if (narration) {
+    if (!noise) return;
+    const paper = ctx.createBufferSource();
+    paper.buffer = noise;
+    filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.value = 1600;
+    filter.Q.value = 0.45;
+    paper.connect(filter).connect(gain);
+    source = paper;
+  } else {
+    const profiles: Record<string, [number, OscillatorType, number]> = {
+      Allie: [780, "sine", 0.045],
+      Noah: [230, "triangle", 0.045],
+      Wiwo: [180, "triangle", 0.045],
+      Tedar: [610, "sawtooth", 0.018],
+      Yono: [980, "sine", 0.022],
+      Detektif: [420, "triangle", 0.035],
+    };
+    const [hz, wave] = profiles[who] || profiles.Detektif;
+    const voice = ctx.createOscillator();
+    voice.type = wave;
+    voice.frequency.value = hz * (0.98 + Math.random() * 0.04);
+    voice.connect(gain);
+    source = voice;
+  }
+  const strength = narration
+    ? 0.022
+    : (
+        {
+          Allie: 0.045,
+          Noah: 0.045,
+          Wiwo: 0.045,
+          Tedar: 0.018,
+          Yono: 0.022,
+        } as Record<string, number>
+      )[who] || 0.035;
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(strength, t + 0.005);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+  gain.connect(typingBus);
+  typingSources.add(source);
+  source.onended = () => {
+    typingSources.delete(source);
+    source.disconnect();
+    filter?.disconnect();
+    gain.disconnect();
+  };
+  source.start(t);
+  source.stop(t + duration + 0.008);
+}
+export function stopTypingSound() {
+  for (const source of typingSources) {
+    try {
+      source.stop();
+    } catch {}
+  }
+  typingSources.clear();
 }
 function piano(hz: number, t: number, velocity = 0.14) {
   note(hz, t, 1.5, velocity);
@@ -253,7 +337,8 @@ export function sfx(
     | "correct"
     | "wrong"
     | "connect"
-    | "phone",
+    | "phone"
+    | "message",
 ) {
   if (!ctx || ctx.state !== "running") return;
   const t = ctx.currentTime;
@@ -293,8 +378,14 @@ export function sfx(
     note(440, t + 0.12, 0.7, 0.09, "effects");
     hiss(t, 0.12, 0.04, 2500);
   }
-  if (kind === "phone") {
+  if (kind === "phone" || kind === "message") {
     [0, 0.19].forEach((d) => note(880, t + d, 0.15, 0.1, "effects"));
+  }
+  if (kind === "message") {
+    [0, 0.16].forEach((d) => {
+      note(110, t + d, 0.085, 0.045, "effects", "triangle");
+      hiss(t + d, 0.07, 0.018, 280);
+    });
   }
 }
 export function stopVoice() {
@@ -304,7 +395,7 @@ export function stopVoice() {
     voiceEl = undefined;
   }
 }
-export function speak(file: "yono-message" | "lift-seven") {
+export function speak(file: "lift-seven") {
   stopVoice();
   if (!levels.spoken || hidden) return;
   voiceEl = new Audio("/audio/" + file + ".mp3");
@@ -313,6 +404,7 @@ export function speak(file: "yono-message" | "lift-seven") {
 }
 export function suspend(value: boolean) {
   hidden = value;
+  if (value) stopTypingSound();
   if (voiceEl && value) voiceEl.pause();
   if (ctx) void (value ? ctx.suspend() : ctx.resume()).catch(() => {});
 }
@@ -328,5 +420,6 @@ export function audioStatus() {
 export function destroyAudio() {
   if (timer) clearInterval(timer);
   stopVoice();
+  stopTypingSound();
   void ctx?.close();
 }

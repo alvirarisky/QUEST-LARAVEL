@@ -2,6 +2,7 @@ import "./style.css";
 import "./cinematic.css";
 import "./moments.css";
 import "./living-world.css";
+import "./navigation.css";
 import {
   sceneObjects,
   isDecoration,
@@ -308,18 +309,38 @@ function dialogue(lines: Line[], after?: () => void) {
     };
     if (reduced) finish();
     else {
-      const timer = setInterval(() => {
+      let timer: ReturnType<typeof setTimeout>;
+      let letters = 0,
+        cadence = 2;
+      const typeNext = () => {
         if (!el.isConnected) {
-          clearInterval(timer);
+          audio.stopTypingSound();
           return;
         }
-        el.textContent = text.slice(0, ++n);
-        if (n >= text.length) {
-          clearInterval(timer);
-          complete = true;
+        const char = text[n++];
+        el.textContent = text.slice(0, n);
+        if (narration) {
+          if (n === 1 || (n % 20 === 0 && /\p{L}/u.test(char)))
+            audio.typingSound(l.who, true);
+        } else if (/\p{L}/u.test(char) && ++letters >= cadence) {
+          audio.typingSound(l.who);
+          letters = 0;
+          cadence = 2 + Math.floor(Math.random() * 2);
         }
-      }, 23);
-      stopTyping = () => clearInterval(timer);
+        if (n >= text.length) {
+          complete = true;
+          return;
+        }
+        timer = setTimeout(
+          typeNext,
+          /[.!?…]/.test(char) ? 210 : /[,;:]/.test(char) ? 105 : 23,
+        );
+      };
+      stopTyping = () => {
+        clearTimeout(timer);
+        audio.stopTypingSound();
+      };
+      timer = setTimeout(typeNext, 23);
     }
     bind("dialog-next", () => {
       if (!complete) {
@@ -343,7 +364,7 @@ function dialogue(lines: Line[], after?: () => void) {
     };
     bind("dialog-log", () => dialogueLog(show));
     if (l.who === "Yono" && l.text.includes("lantai 8"))
-      audio.speak("yono-message");
+      yonoNotification();
     if (l.who === "Nomor tak dikenal") audio.sfx("phone");
   };
   show();
@@ -377,6 +398,14 @@ function completedIntro() {
   checkpoint();
   tutorial();
 }
+function yonoNotification() {
+  audio.sfx("message");
+  if (!reduced)
+    document.querySelector<HTMLElement>(".intro-phone")?.animate?.(
+      [{ translate: "0 0" }, { translate: "-2px 0" }, { translate: "2px 0" }, { translate: "0 0" }],
+      { duration: 180, iterations: 2 },
+    );
+}
 function briefing() {
   worldReady = false;
   let index = 0;
@@ -392,10 +421,10 @@ function briefing() {
   };
   const show = () => {
     cancelTyping();
-    app.innerHTML = `<main class="cinema-intro"><div class="intro-image"></div><header class="intro-header"><span class="wordmark">D<span>/</span>7</span><button id="brief-skip" class="text-btn">Lewati ${icon("arrow", 18)}</button></header><div class="intro-layout"><section class="intro-copy"><p class="intro-kicker">Di atas tujuh</p><h1>${index === 0 ? "Paketnya tiba.<br>Kurirnya hilang." : "Cari jejaknya.<br>Uji ceritanya."}</h1><p>${index === 0 ? "Lo detektif lepas. Yono belum pulang dari Gedung W. Paketnya sudah di kantor Wiwo, tapi pesan terakhirnya menyebut lantai yang nggak ada di denah." : "Temui Allie di resepsionis. Klik orang atau benda di ruangan, baca buktinya, lalu cocokkan keterangan saksi."}</p>${index === 1 ? '<p class="intro-rule">Ada 8 analisis Laravel di sepanjang kasus. Cuma jawaban pertama yang dihitung skor. Eksplorasinya boleh lo ulang.</p>' : '<p class="intro-question">Gedungnya tujuh lantai.<br>Kenapa Yono bilang delapan?</p>'}<div class="intro-controls"><div class="intro-dots" aria-label="Langkah pembuka">${[0, 1].map((i) => `<button data-intro="${i}" aria-label="Langkah ${i + 1}" aria-current="${i === index ? "step" : "false"}"></button>`).join("")}</div><button id="brief-next" class="primary">${index === 0 ? "Gimana mulainya?" : "Masuk lobi"} ${icon("arrow", 18)}</button></div></section><aside class="intro-phone" aria-label="Pesan terakhir Yono"><div class="phone-top"><span class="phone-avatar">Y</span><div><b>Yono</b><small>Terakhir aktif tadi malam</small></div></div><div class="phone-chat"><span class="chat-date">Kemarin · 20.16</span><p id="typed-message" class="chat-bubble"></p><small class="chat-receipt">Terkirim</small></div><div class="phone-context">${index === 0 ? "Sejak pesan ini, nggak ada kabar lagi." : "Mulai dari satu orang.<br>Allie melihat Yono datang."}</div></aside></div></main>${common}`;
-    const text = "Gue udah lantai 8. Orangnya belum ada.";
+    app.innerHTML = `<main class="cinema-intro"><div class="intro-image"></div><header class="intro-header"><span class="wordmark">D<span>/</span>7</span><button id="brief-skip" class="text-btn">Lewati ${icon("arrow", 18)}</button></header><div class="intro-layout"><section class="intro-copy"><p class="intro-kicker">${index === 0 ? "Kasus: kurir yang hilang" : "Tugas kamu"}</p><h1>${index === 0 ? "Yono mengantar paket,<br>lalu tidak pernah pulang." : "Temukan Yono dan<br>ungkap apa yang terjadi."}</h1><p>${index === 0 ? "Pukul 20.14 tadi malam, kurir Yono membawa paket YN07 naik lift di Gedung W untuk diantar ke kantor Pak Wiwo. Pagi ini paketnya sudah ada di meja Wiwo, tetapi Yono tidak ditemukan di mana pun." : "Kamu detektif lepas yang diminta rekan Yono. Periksa ruangan di Gedung W, tanyai saksi, dan baca buktinya untuk mencari tahu ke mana Yono pergi setelah pukul 20.16."}</p>${index === 1 ? '<p class="intro-rule">Cara bermain: klik orang atau benda di ruangan. Setiap benda penting membuka satu analisis Laravel (total 8: MVC, routing, controller, Blade, dan lainnya). Tiap soal bernilai 12,5 poin dan hanya jawaban pertama yang dihitung. Jawaban salah tidak menghentikan kasus.</p>' : '<p class="intro-question">Ada yang janggal: pesan terakhir Yono menyebut lantai 8,<br>padahal Gedung W hanya punya 7 lantai.</p>'}<div class="intro-controls"><div class="intro-dots" aria-label="Langkah pembuka">${[0, 1].map((i) => `<button data-intro="${i}" aria-label="Langkah ${i + 1}" aria-current="${i === index ? "step" : "false"}"></button>`).join("")}</div><button id="brief-next" class="primary">${index === 0 ? "Apa tugas saya?" : "Masuk lobi"} ${icon("arrow", 18)}</button></div></section><aside class="intro-phone" aria-label="Pesan terakhir Yono"><div class="phone-top"><span class="phone-avatar">Y</span><div><b>Yono</b><small>Terakhir aktif tadi malam</small></div></div><div class="phone-chat"><span class="chat-date">Kemarin · 20.16</span><p id="typed-message" class="chat-bubble"></p><small class="chat-receipt">Terkirim</small></div><div class="phone-context">${index === 0 ? "Setelah pesan ini, Yono tidak memberi kabar lagi." : "Mulai dari lobi.<br>Allie, resepsionis malam, bertemu Yono lebih dulu."}</div></aside></div></main>${common}`;
+    const text = "Saya sudah lantai 8. Orangnya belum ada.";
     const target = $("typed-message");
-    let n = 0;
+    let n = 0, letters = 0;
     if (reduced || index === 1) target.textContent = text;
     else {
       const timer = setInterval(() => {
@@ -404,9 +433,10 @@ function briefing() {
           return;
         }
         target.textContent = text.slice(0, ++n);
+        if (/\p{L}/u.test(text[n - 1]) && ++letters % 3 === 0) audio.typingSound("Yono");
         if (n >= text.length) clearInterval(timer);
       }, 32);
-      cancelTyping = () => clearInterval(timer);
+      cancelTyping = () => { clearInterval(timer); audio.stopTypingSound(); };
     }
     bind("brief-skip", enter);
     bind("brief-next", () => {
@@ -423,13 +453,13 @@ function briefing() {
           show();
         }),
     );
-    if (index === 0) audio.speak("yono-message");
+    if (index === 0) yonoNotification();
   };
   show();
 }
 function tutorial() {
   modal(
-    `${header("Cara main", "Ikuti jejak Yono.")}<div class="guide-grid"><div><b>Periksa ruangan</b><p>Klik cincin di dekat orang atau benda. Tekan O buat daftar objek.</p></div><div><b>Baca bukti</b><p>Map di pojok nyimpen semua temuan lo. Cocokkan isinya dengan keterangan saksi.</p></div><div><b>Uji sambungannya</b><p>Delapan analisis Laravel muncul sesudah observasi. Cuma jawaban pertama yang dihitung skor.</p></div><div><b>Kalau mentok</b><p>Buka Petunjuk. Bantuan dan salah pilih bukti nggak ngurangin skor.</p></div></div><button id="understood" class="primary">${state ? "Balik ke kasus" : "Paham"} ${icon("arrow", 18)}</button>`,
+    `${header("Cara main", "Ikuti jejak Yono.")}<div class="guide-grid"><div><b>Periksa ruangan</b><p>Klik cincin di dekat orang atau benda. Tekan O buat daftar objek.</p></div><div><b>Baca bukti</b><p>Map di pojok menyimpan semua temuan kamu. Kamu dapat mencocokkan isinya dengan keterangan saksi.</p></div><div><b>Uji sambungannya</b><p>Delapan analisis Laravel muncul sesudah observasi. Hanya jawaban pertama yang dihitung skor.</p></div><div><b>Kalau mentok</b><p>Buka Petunjuk. Bantuan dan salah pilih bukti tidak mengurangi skor.</p></div></div><button id="understood" class="primary">${state ? "Balik ke kasus" : "Paham"} ${icon("arrow", 18)}</button>`,
     true,
     false,
     "drawer",
@@ -445,7 +475,7 @@ function home() {
   world = undefined;
   state = undefined;
   const saved = loadSave();
-  app.innerHTML = `<main class="landing cinema-landing"><div class="landing-photo"></div><div class="landing-shade"></div><header class="landing-header"><a class="wordmark" href="/" aria-label="Di atas tujuh">D<span>/</span>7</a><button class="outline-btn" id="home-audio">${icon("sound", 18)}<span>Audio</span></button></header><div class="landing-content"><section class="title-block"><p class="landing-subtitle">Sebuah kasus Laravel</p><h1>Di atas<br><em>tujuh.</em></h1><p class="tagline">Gedungnya tujuh lantai.<br>Pesan terakhirnya dari lantai delapan.</p><button class="text-btn" id="home-guide">Baca cara main ${icon("arrow", 18)}</button></section><section class="entry-card"><h2>Lo yang pegang kasusnya.</h2><p class="entry-copy">Isi identitas buat hasil praktikum lo.<br>Setelah ini, kita buka pesan terakhir Yono.</p><form id="identity-form"><label>Nama lengkap<input id="name" name="name" required maxlength="80" autocomplete="name" placeholder="Nama lo"></label><div class="form-row"><label>NIM<input id="student" name="student" required maxlength="40" autocomplete="off" placeholder="Nomor mahasiswa"></label><label>Kelas<input id="kelas" name="kelas" required maxlength="40" autocomplete="off" placeholder="IT-xx-xx"></label></div><button class="primary" id="start" type="submit">Buka kasus ${icon("arrow", 18)}</button><p id="start-error" class="error" role="alert"></p></form>${saved ? `<button id="resume" class="resume-btn">Lanjutkan kasus ${esc(saved.run.identity.name)} ${icon("arrow", 18)}</button>` : ""}<p class="entry-note">Pengantar Laravel · 8 analisis · Progres tersimpan</p></section></div><footer class="landing-footer"><span>Praktikum pemrograman web · Week 10</span><a href="/verify">Verifikasi hasil ${icon("arrow", 16)}</a></footer></main>${common}`;
+  app.innerHTML = `<main class="landing cinema-landing"><div class="landing-photo"></div><div class="landing-shade"></div><header class="landing-header"><a class="wordmark" href="/" aria-label="Di atas tujuh">D<span>/</span>7</a><button class="outline-btn" id="home-audio">${icon("sound", 18)}<span>Audio</span></button></header><div class="landing-content"><section class="title-block"><p class="landing-subtitle">Sebuah kasus Laravel</p><h1>Di atas<br><em>tujuh.</em></h1><p class="tagline">Gedungnya tujuh lantai.<br>Pesan terakhirnya dari lantai delapan.</p><button class="text-btn" id="home-guide">Baca cara main ${icon("arrow", 18)}</button></section><section class="entry-card"><h2>Kamu yang pegang kasusnya.</h2><p class="entry-copy">Isi identitas buat hasil praktikum kamu.<br>Setelah ini, kita buka pesan terakhir Yono.</p><form id="identity-form"><label>Nama lengkap<input id="name" name="name" required maxlength="80" autocomplete="name" placeholder="Nama kamu"></label><div class="form-row"><label>NIM<input id="student" name="student" required maxlength="40" autocomplete="off" placeholder="Nomor mahasiswa"></label><label>Kelas<input id="kelas" name="kelas" required maxlength="40" autocomplete="off" placeholder="TI-xx-xx"></label></div><button class="primary" id="start" type="submit">Buka kasus ${icon("arrow", 18)}</button><p id="start-error" class="error" role="alert"></p></form>${saved ? `<button id="resume" class="resume-btn">Lanjutkan kasus ${esc(saved.run.identity.name)} ${icon("arrow", 18)}</button>` : ""}<p class="entry-note">Pengantar Laravel · 8 analisis · Progres tersimpan</p></section></div><footer class="landing-footer"><span>Praktikum pemrograman web · Week 10</span><a href="/verify">Verifikasi hasil ${icon("arrow", 16)}</a></footer></main>${common}`;
   $("identity-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     if (busy) return;
@@ -523,7 +553,7 @@ async function resumeRun(saved: Save) {
   }
 }
 async function mountGame() {
-  app.innerHTML = `<main class="cinema-game"><div class="scene-stage"><div id="world"></div><div class="world-tint" aria-hidden="true"></div><div class="world-atmosphere" aria-hidden="true"><i class="atmosphere-dust"></i><i class="atmosphere-rain"></i><i class="light-haze"></i><i class="world-vignette"></i></div><div class="scene-scrim"></div><div id="loading" class="loading"><span class="loading-mark">D / 7</span><p>Ngebuka tempat kejadian…</p></div></div><header class="cinema-header"><button class="wordmark" id="brand-game" aria-label="Jeda permainan">D<span>/</span>7</button><span class="narrative-clock" id="narrative-clock" title="Waktu cerita fiksi, bukan batas waktu" aria-label="Jam cerita fiksi"></span><button class="place-heading" id="places-btn" aria-label="Pindah lokasi"><span id="location-heading"></span>${icon("location", 16)}</button><nav class="scene-tools" aria-label="Peralatan penyelidikan"><button id="objects-btn" aria-label="Daftar objek" title="Daftar objek">${icon("objects")}</button><button id="journal-btn" aria-label="Catatan" title="Catatan">${icon("notes")}</button><button id="hint-btn" aria-label="Petunjuk" title="Petunjuk">${icon("hint")}</button><button id="settings-btn" aria-label="Jeda" title="Jeda">${icon("pause")}</button><span class="player-avatar" id="player-name" title="Penyelidik">${portrait("Detektif")}</span></nav></header><p id="objective" class="scene-objective" role="status"></p><button id="evidence-btn" class="case-map-button" aria-label="Papan bukti">${icon("map")}<span id="evidence-count"></span></button><div id="floor-panel"></div></main>${common}`;
+  app.innerHTML = `<main class="cinema-game"><div class="scene-stage"><div id="world"></div><div class="world-tint" aria-hidden="true"></div><div class="world-atmosphere" aria-hidden="true"><i class="atmosphere-dust"></i><i class="atmosphere-rain"></i><i class="light-haze"></i><i class="world-vignette"></i></div><div class="scene-scrim"></div><div id="loading" class="loading"><span class="loading-mark">D / 7</span><p>Ngebuka tempat kejadian…</p></div></div><header class="cinema-header"><button class="wordmark" id="brand-game" aria-label="Jeda permainan">D<span>/</span>7</button><span class="narrative-clock" id="narrative-clock" title="Waktu cerita fiksi, bukan batas waktu" aria-label="Jam cerita fiksi"></span><button class="place-heading" id="places-btn" aria-label="Pindah lokasi"><span id="location-heading"></span>${icon("location", 16)}<span class="place-switch-label">Pindah</span></button><nav class="scene-tools" aria-label="Peralatan penyelidikan"><button id="objects-btn" aria-label="Daftar objek" title="Daftar objek">${icon("objects")}</button><button id="journal-btn" aria-label="Catatan" title="Catatan">${icon("notes")}</button><button id="hint-btn" aria-label="Petunjuk" title="Petunjuk">${icon("hint")}</button><button id="settings-btn" aria-label="Jeda" title="Jeda">${icon("pause")}</button><span class="player-avatar" id="player-name" title="Penyelidik">${portrait("Detektif")}</span></nav></header><button type="button" id="objective" class="scene-objective"></button><button id="evidence-btn" class="case-map-button" aria-label="Papan bukti">${icon("map")}<span id="evidence-count"></span></button><div id="floor-panel"></div></main>${common}`;
   bind("journal-btn", journal);
   bind("hint-btn", hints);
   bind("settings-btn", settings);
@@ -531,6 +561,7 @@ async function mountGame() {
   bind("evidence-btn", evidenceList);
   bind("objects-btn", objectList);
   bind("places-btn", locationList);
+  bind("objective", goNext);
   $("player-name").title = state!.run.identity.name;
   $("player-name").textContent = state!.run.identity.name
     .trim()
@@ -603,7 +634,7 @@ function objectList() {
 }
 function locationList() {
   modal(
-    `${header("Gedung W", "Lo mau ke mana?")}<nav class="object-list">${availablePlaces(
+    `${header("Gedung W", "Kamu mau ke mana?")}<nav class="object-list">${availablePlaces(
       state!,
     )
       .map(
@@ -650,25 +681,30 @@ function goNext() {
     return;
   }
   const h = places[step.place].hotspots.find((h) => h.id === step.hotspot);
-  if (h) world?.inspect(h);
+  if (h) {
+    world?.setFocus(h.id);
+    document
+      .querySelector<HTMLButtonElement>(`[data-scene-object="${h.id}"]`)
+      ?.focus({ preventScroll: true });
+  }
 }
 const detectiveThoughts: Record<string, string> = {
-  "meet-allie": "Gue mulai dari orang yang melihat Yono datang.",
-  ledger: "Buku tamu: siapa yang nunggu Yono?",
+  "meet-allie": "Saya mulai dari orang yang melihat Yono datang.",
+  ledger: "Buku tamu: siapa yang menunggu Yono?",
   plan: "Lantai delapan—tapi denahnya bilang apa?",
-  cctv: "Sekarang gue butuh mata yang nggak mengandalkan ingatan.",
-  "allie-proof": "Allie, ada sebelas menit yang belum lo ceritain.",
-  "meet-noah": "Akses servis? Gue perlu cari Noah di area lift.",
+  cctv: "Sekarang saya butuh mata yang tidak mengandalkan ingatan.",
+  "allie-proof": "Allie, ada sebelas menit yang belum kamu ceritakan.",
+  "meet-noah": "Akses servis? Saya perlu cari Noah di area lift.",
   report: "Noah sudah memperingatkan siapa?",
-  photo: "Yon, apa yang lo lihat di sana?",
+  photo: "Yon, apa yang kamu lihat di sana?",
   "noah-proof": "Noah, apa yang ditutup di denah ini?",
-  "meet-wiwo": "Sekarang gue perlu ke kantor Wiwo dan lihat paketnya.",
+  "meet-wiwo": "Sekarang saya perlu ke kantor Wiwo dan lihat paketnya.",
   parcel: "Siapa yang mau paket ini sampai tanpa kurirnya?",
   "meet-tedar": "Tedar ngurus kiriman ini; kapan tepatnya dia pulang?",
   access: "Kalau alibinya benar, catatan kartu bakal cocok.",
   "tedar-proof": "Tedar, jam delapan yang mana?",
-  "archive-door": "Gue perlu ke area servis; Noah bisa bantu membuka arsip.",
-  "find-yono": "Yon? Kalau lo dengar gue, jawab.",
+  "archive-door": "Saya perlu ke area servis; Noah bisa bantu membuka arsip.",
+  "find-yono": "Yon? Kalau kamu dengar saya, jawab.",
   manifest: "Apa daftar aslinya masih di sini?",
   conclusion: "Orang, jalur, motif—apa semuanya sudah nyambung?",
 };
@@ -694,12 +730,12 @@ function renderHUD() {
   const step = nextStep(state);
   const thought =
     sceneThought?.step === step.id ? sceneThought.text : undefined;
-  $("objective").textContent =
-    thought ||
-    (state.location === step.place
-      ? step.title
-      : `${step.title} ${places[step.place].name}.`);
-  $("objective").classList.toggle("detective-thought", !!thought);
+  $("objective").innerHTML =
+    `${thought ? `<span class="objective-thought">${esc(thought)}</span>` : ""}<span class="objective-action">${esc(step.title)} · ${esc(places[step.place].name)} →</span>`;
+  $("objective").setAttribute(
+    "aria-label",
+    `${step.title} · ${places[step.place].name}. ${state.location === step.place ? "Sorot tujuan" : "Pindah lokasi"}`,
+  );
   $("location-heading").textContent = places[state.location].name;
   if ($("narrative-clock")) {
     $("narrative-clock").textContent = narrativeTime(availablePlaces(state));
@@ -720,9 +756,8 @@ function renderHUD() {
 
   $("evidence-count").textContent = String(state.clues.length);
   $("floor-panel").innerHTML =
-    `<button id="floor-toggle" aria-label="Panel lift, progres Laravel">${icon("lift")}</button><div class="floor-buttons" aria-label="Progres analisis Laravel">${floorsMarkup()}</div>`;
+    `<span class="analysis-label">Analisis ${done()}/8</span><button id="floor-toggle" aria-label="Lihat progres analisis ${done()} dari 8">Rincian</button><div class="floor-buttons" role="list" aria-label="Progres analisis Laravel">${floorsMarkup()}</div>`;
   bind("floor-toggle", floorList);
-  bindFloors();
   audio.setTension(done() >= 7 ? 0.85 : done() >= 5 ? 0.5 : 0.1);
   audio.setTheme(done() >= 7 ? "reveal" : "explore");
   world?.setProgress(done());
@@ -907,7 +942,7 @@ function evidenceList() {
     })
     .join("");
   modal(
-    `${header("Map kasus", "Jejak yang lo pegang")}<div class="corkboard-wrap"><div class="corkboard"><svg class="evidence-threads" viewBox="0 0 1000 720" preserveAspectRatio="none" aria-label="Hubungan antar bukti" role="img">${threads}</svg>${ids.map((id, i) => `<button class="pinned-evidence ${["access", "report", "ledger", "manifest"].includes(id) ? "paper-note" : "photo-note"}" data-clue="${id}" style="--x:${point(i).x / 10}%;--y:${point(i).y / 7.2}%;--tilt:${[-3, 2, -1, 3][i % 4]}deg"><span class="pin"></span><span class="prop" style="--col:${evidence[id].frame % 4};--row:${Math.floor(evidence[id].frame / 4)}"></span><b>${esc(evidence[id].title)}</b><small>${esc(evidence[id].tag.toLocaleLowerCase("id-ID"))}</small></button>`).join("")}</div></div>`,
+    `${header("Map kasus", "Jejak yang kamu pegang")}<div class="corkboard-wrap"><div class="corkboard"><svg class="evidence-threads" viewBox="0 0 1000 720" preserveAspectRatio="none" aria-label="Hubungan antar bukti" role="img">${threads}</svg>${ids.map((id, i) => `<button class="pinned-evidence ${["access", "report", "ledger", "manifest"].includes(id) ? "paper-note" : "photo-note"}" data-clue="${id}" style="--x:${point(i).x / 10}%;--y:${point(i).y / 7.2}%;--tilt:${[-3, 2, -1, 3][i % 4]}deg"><span class="pin"></span><span class="prop" style="--col:${evidence[id].frame % 4};--row:${Math.floor(evidence[id].frame / 4)}"></span><b>${esc(evidence[id].title)}</b><small>${esc(evidence[id].tag.toLocaleLowerCase("id-ID"))}</small></button>`).join("")}</div></div>`,
     true,
     true,
     "board",
@@ -927,41 +962,20 @@ function journal() {
 }
 function floorsMarkup() {
   return challengeNotes
-    .map(
-      (n, i) =>
-        `<span class="floor-wrap"><button data-floor="${i}" class="floor-button ${i < done() ? "floor-done" : i === done() ? "floor-active" : ""}" aria-label="${i + 1}. ${esc(n.concept)}${i < done() ? ", selesai" : i === done() ? ", analisis berikutnya" : ", belum terbuka"}" ${i > done() ? "disabled" : ""}><span>${i + 1}</span>${i === 7 && done() < 7 ? icon("lock", 12) : ""}</button><span class="floor-tooltip">${esc(n.concept)}${i < done() ? " · selesai" : ""}</span></span>`,
-    )
+    .map((n, i) => {
+      const status =
+        i < done() ? "selesai" : i === done() ? "berikutnya" : "belum terbuka";
+      return `<span class="floor-wrap" role="listitem"><span tabindex="0" class="analysis-mark ${i < done() ? "is-done" : i === done() ? "is-current" : ""}" aria-label="${i + 1}. ${esc(n.concept)}, ${status}">${i < done() ? "✓" : i + 1}</span><span class="floor-tooltip">${esc(n.concept)} · ${status}</span></span>`;
+    })
     .join("");
-}
-function bindFloors() {
-  document.querySelectorAll<HTMLButtonElement>("[data-floor]").forEach(
-    (b) =>
-      (b.onclick = () => {
-        const i = Number(b.dataset.floor),
-          n = challengeNotes[i];
-        if (i < done()) {
-          const f = state!.reviews.find((f) => f.question.number === i + 1);
-          if (f) {
-            modal(
-              `${header("Analisis selesai", n.concept)}<p>${esc(f.explanation)}</p><pre>${esc(expectedText(f))}</pre>`,
-            );
-            return;
-          }
-        }
-        modal(
-          `${header("Analisis berikutnya", n.concept)}<p>${esc(n.why)}</p><p>${esc(nextStep(state!).detail)}</p>`,
-        );
-      }),
-  );
 }
 function floorList() {
   modal(
-    `${header("Panel lift", "Delapan sambungan")}<div class="floors-mobile">${floorsMarkup()}</div>`,
+    `${header("Progres Laravel", `Analisis ${done()}/8`)}<div class="floors-mobile" role="list">${floorsMarkup()}</div>`,
     true,
     false,
     "drawer",
   );
-  bindFloors();
 }
 function openPerson(id: Person) {
   if (id === "yono") {
@@ -986,7 +1000,7 @@ function openPerson(id: Person) {
         { who: "Yono", text: people.yono.intro },
         {
           who: "Yono",
-          text: "Tedar menyuruh gue ke arsip. Gue lihat paket-paket yang nomornya ada di daftar kiriman. Pas gue tanya, dia bawa paket gue pergi dan mengunci pintu dari luar.",
+          text: "Tedar menyuruh saya ke arsip. Saya lihat paket-paket yang nomornya ada di daftar kiriman. Pas saya tanya, dia bawa paket saya pergi dan mengunci pintu dari luar.",
         },
       ],
       () => {
@@ -1009,11 +1023,11 @@ function openPerson(id: Person) {
   if (!flag(key)) {
     const follow: Record<string, string> = {
       allie:
-        "Yono menulis buku tamu sebelum naik. Coba periksa buku di meja gue; tujuan dan instruksi penerimanya ada di situ.",
-      noah: "Laporan gue ada di panel. Gue minta akses dimatikan sebelum kejadian, tapi belum disetujui.",
-      wiwo: "Gue minta audit karena ada kiriman tercatat diterima, tapi nggak masuk kantor. Paket YN07 membawa salinannya.",
+        "Yono menulis buku tamu sebelum naik. Coba periksa buku di meja saya; tujuan dan instruksi penerimanya ada di situ.",
+      noah: "Laporan saya ada di panel. Saya minta akses dimatikan sebelum kejadian, tapi belum disetujui.",
+      wiwo: "Saya minta audit karena ada kiriman tercatat diterima, tapi tidak masuk kantor. Paket YN07 membawa salinannya.",
       tedar:
-        "Kalau lo mau memeriksa waktu pulang gue, terminal akses ada di meja. Tapi gue yakin tidak ada yang aneh.",
+        "Kalau kamu mau memeriksa waktu pulang saya, terminal akses ada di meja. Tapi saya yakin tidak ada yang aneh.",
     };
     dialogue(
       [
@@ -1027,8 +1041,8 @@ function openPerson(id: Person) {
         const question: Record<string, string> = {
           allie: "Yono diarahkan ke mana?",
           noah: "Ada catatan kondisi lift?",
-          wiwo: "Kenapa lo minta audit?",
-          tedar: "Ada catatan waktu pulang lo?",
+          wiwo: "Kenapa kamu minta audit?",
+          tedar: "Ada catatan waktu pulang kamu?",
         };
         const ask = () =>
           dialogue([{ who: people[id].name, text: follow[id] }], () => {
@@ -1041,7 +1055,7 @@ function openPerson(id: Person) {
             );
           });
         modal(
-          `<div class="vn-shell" data-speaker="${id}" style="${speakerStyle(people[id].name)}">${speakerPortrait(people[id].name)}<div class="vn-content"><div class="vn-top"><span id="modal-title" class="speaker-tab">Tanya ${people[id].name}</span></div><div class="vn-choices"><button id="witness-question">${esc(question[id])} ${icon("arrow", 18)}</button><button id="witness-repeat">Ulangi keterangan lo tadi.</button></div></div></div>`,
+          `<div class="vn-shell" data-speaker="${id}" style="${speakerStyle(people[id].name)}">${speakerPortrait(people[id].name)}<div class="vn-content"><div class="vn-top"><span id="modal-title" class="speaker-tab">Tanya ${people[id].name}</span></div><div class="vn-choices"><button id="witness-question">${esc(question[id])} ${icon("arrow", 18)}</button><button id="witness-repeat">Ulangi keterangan kamu tadi.</button></div></div></div>`,
           false,
           false,
           "dialogue",
@@ -1064,7 +1078,7 @@ function personMenu(id: Person) {
       (id === "noah" && flag("noahTruth")) ||
       (id === "tedar" && flag("tedarTruth"));
   modal(
-    `${header(p.role, p.name)}<div class="person-summary">${portrait(p.name)}<div><p>${esc(p.intro)}</p><small>${checked ? "Keterangan ini sudah lo cocokkan dengan bukti." : "Ini keterangan awal. Bandingkan dengan bukti yang ditemukan."}</small></div></div><div class="person-options"><button id="ask-person">Apa yang lo lihat semalam? <span>${icon("arrow", 18)}</span></button><button id="show-proof">Ada bukti yang perlu lo jelasin. <span>${icon("map", 18)}</span></button></div><button id="person-next" class="primary">${esc(leadLabel(nextStep(state!)))} ${icon("arrow", 18)}</button>`,
+    `${header(p.role, p.name)}<div class="person-summary">${portrait(p.name)}<div><p>${esc(p.intro)}</p><small>${checked ? "Keterangan ini sudah kamu cocokkan dengan bukti." : "Ini keterangan awal. Bandingkan dengan bukti yang ditemukan."}</small></div></div><div class="person-options"><button id="ask-person">Apa yang kamu lihat semalam? <span>${icon("arrow", 18)}</span></button><button id="show-proof">Ada bukti yang perlu kamu jelaskan. <span>${icon("map", 18)}</span></button></div><button id="person-next" class="primary">${esc(leadLabel(nextStep(state!)))} ${icon("arrow", 18)}</button>`,
   );
   bind("ask-person", () => askPerson(id));
   bind("show-proof", () => chooseProof(id));
@@ -1073,11 +1087,11 @@ function personMenu(id: Person) {
 function askPerson(id: Person) {
   const texts: Record<string, string> = {
     allie:
-      "Gue mengaku di meja saat Yono naik. Kalau ada rekaman yang menunjukkan hal berbeda, tunjukkan ke gue.",
-    noah: "Denah pengunjung tidak lengkap. Lihat bagian yang ditutup, lalu cocokkan dengan laporan gue di panel.",
-    wiwo: "Nomor paket yang sama ada di daftar diterima dan daftar hilang. Itu alasan gue meminta pemeriksaan kiriman.",
+      "Saya mengaku di meja saat Yono naik. Kalau ada rekaman yang menunjukkan hal berbeda, tunjukkan ke saya.",
+    noah: "Denah pengunjung tidak lengkap. Lihat bagian yang ditutup, lalu cocokkan dengan laporan saya di panel.",
+    wiwo: "Nomor paket yang sama ada di daftar diterima dan daftar hilang. Itu alasan saya meminta pemeriksaan kiriman.",
     tedar:
-      "Gue pulang tepat pukul 20.00. Catatan kartu akses, kalau ada, seharusnya bisa menjelaskan waktunya.",
+      "Saya pulang tepat pukul 20.00. Catatan kartu akses, kalau ada, seharusnya bisa menjelaskan waktunya.",
   };
   dialogue([{ who: people[id].name, text: texts[id] }], () => personMenu(id));
 }
@@ -1086,7 +1100,7 @@ const testimony: Record<
   { statement: string; question: string; candidates: string[] }
 > = {
   allie: {
-    statement: "Gue di meja waktu Yono masuk lift.",
+    statement: "Saya di meja waktu Yono masuk lift.",
     question: "Bukti mana yang bisa memeriksa posisi Allie pada waktu itu?",
     candidates: ["message", "ledger", "cctv"],
   },
@@ -1097,7 +1111,7 @@ const testimony: Record<
     candidates: ["plan", "report", "photo"],
   },
   tedar: {
-    statement: "Gue meninggalkan kantor tepat jam delapan.",
+    statement: "Saya meninggalkan kantor tepat jam delapan.",
     question:
       "Bukti mana yang menunjukkan Tedar masih memakai akses setelah pukul 20.00?",
     candidates: ["parcel", "access", "photo"],
@@ -1136,7 +1150,7 @@ function showProof(id: Person, c: string) {
       flag: "allieTruth",
       title: "Allie mengoreksi keterangannya.",
       reply:
-        "Oke. Gue ke belakang dari 20.13 sampai 20.24. Anak gue demam di rumah; gue nenangin dia lewat telepon. Gue takut ngaku ninggalin pos. Sebelum pergi, gue dengar Yono ditelepon Tedar dan disuruh langsung naik. Gue nggak melihat dia masuk lift.",
+        "Oke. Saya ke belakang dari 20.13 sampai 20.24. Anak saya demam di rumah; saya menenangkan dia lewat telepon. Saya takut mengaku meninggalkan pos. Sebelum pergi, saya dengar Yono ditelepon Tedar dan disuruh langsung naik. Saya tidak melihat dia masuk lift.",
       meaning:
         "Allie menyembunyikan telepon keluarganya; arahan kepada Yono datang dari Tedar.",
     },
@@ -1151,7 +1165,7 @@ function showProof(id: Person, c: string) {
       flag: "tedarTruth",
       title: "Waktu pada log membantah alibi.",
       reply:
-        "Kartu TD-02 memang punya gue. Gue… kembali mengambil berkas. Gue nyebut teknisi buat ngulur pertanyaan lo, bukan karena gue lihat Noah memakai kartu itu. Tapi penggunaan kartu saja belum menjelaskan semua yang terjadi di arsip.",
+        "Kartu TD-02 memang punya saya. Saya… kembali mengambil berkas. Saya menyebut teknisi buat mengulur pertanyaan kamu, bukan karena saya lihat Noah memakai kartu itu. Tapi penggunaan kartu saja belum menjelaskan semua yang terjadi di arsip.",
       meaning:
         "Tedar mengalihkan pertanyaan ke teknisi. Noah bisa bantu membuka jalurnya; Yono yang perlu kita cari.",
     },
@@ -1159,7 +1173,7 @@ function showProof(id: Person, c: string) {
       flag: "wiwoProof",
       title: "Tujuan paket menjadi jelas.",
       reply:
-        "Daftar itu salinan audit. Yang asli seharusnya bersama Yono. Gue minta keamanan ikut memeriksa jika ada pengalihan kiriman.",
+        "Daftar itu salinan audit. Yang asli seharusnya bersama Yono. Saya minta keamanan ikut memeriksa jika ada pengalihan kiriman.",
       meaning:
         "Paket itu berisi catatan kiriman bermasalah; isinya memberi alasan seseorang ingin menghentikan Yono.",
     },
@@ -1173,7 +1187,7 @@ function showProof(id: Person, c: string) {
     audio.sfx("paper");
     chooseProof(
       id,
-      "Belum nyambung. Cocokkan waktunya dengan ucapan saksi. Coba bukti lain; skor lo aman.",
+      "Belum nyambung. Cocokkan waktunya dengan ucapan saksi. Coba bukti lain; skor kamu aman.",
     );
     return;
   }
@@ -1198,7 +1212,7 @@ function showProof(id: Person, c: string) {
   });
 }
 const analysisFrames = [
-  "Kayak gedung ini: ada yang nyimpen catatan, nampilin isi, dan ngarahin permintaan.",
+  "Seperti gedung ini: ada yang menyimpan catatan, menampilkan isi, dan mengarahkan permintaan.",
   "Berkas punya alamatnya sendiri. Cari ruangan yang tepat di struktur Laravel.",
   "Route itu pintu masuk: alamat dan jenis permintaannya harus cocok.",
   "Noah butuh pengendali lift. Artisan yang nyiapin berkasnya.",
@@ -1259,7 +1273,7 @@ function renderQuiz(q: Question) {
     const scroll = rendered ? $("dialog-card").scrollTop : 0;
     rendered = true;
     modal(
-      `${header(challengeNotes[q.number - 1].concept, esc(q.title))}<p class="analysis-metaphor">${esc(analysisFrames[q.number - 1])}</p>${analysisReferences(q)}<p class="quiz-context">${esc(q.context)}</p><p class="quiz-instruction">${esc(q.instruction)}</p><form id="quiz-form">${q.kind === "single" ? `<div class="quiz-options">${q.options.map((o, i) => `<label class="code-option"><input type="radio" name="answer" value="${o.id}" required><span class="option-letter">${String.fromCharCode(65 + i)}</span><code>${esc(o.text)}</code></label>`).join("")}</div>` : q.kind === "match" ? `<div class="match-rows">${q.rows!.map((r, i) => `<label><span>${esc(r)}</span><select id="match-${i}" required><option value="">Pilih pasangan…</option>${q.options.map((o) => `<option value="${o.id}">${esc(o.text)}</option>`).join("")}</select></label>`).join("")}</div>` : `<div class="order-chosen" aria-live="polite">${(answer as string[]).length ? (answer as string[]).map((id, i) => `<span><b>${i + 1}</b>${esc(q.options.find((o) => o.id === id)!.text)}</span>`).join("") : '<span class="muted">Urutan pilihanmu akan muncul di sini.</span>'}</div><div class="order-options">${q.options.map((o) => `<button type="button" data-order="${o.id}" ${(answer as string[]).includes(o.id) ? "disabled" : ""}>${esc(o.text)} <span>+</span></button>`).join("")}</div><button id="reset-order" type="button" class="text-btn">Reset urutan</button>`}<div class="quiz-submit">${q.number === 1 ? "<p>Cuma jawaban pertama yang dihitung skor. Periksa dulu sebelum kirim.</p>" : "<p>Baca ulang sebelum kirim.</p>"}<button class="primary" id="send-answer" type="submit">Kirim jawaban ${icon("arrow", 18)}</button></div><p class="error" id="quiz-error" role="alert"></p></form>`,
+      `${header(challengeNotes[q.number - 1].concept, esc(q.title))}<p class="analysis-metaphor">${esc(analysisFrames[q.number - 1])}</p>${analysisReferences(q)}<p class="quiz-context">${esc(q.context)}</p><p class="quiz-instruction">${esc(q.instruction)}</p><form id="quiz-form">${q.kind === "single" ? `<div class="quiz-options">${q.options.map((o, i) => `<label class="code-option"><input type="radio" name="answer" value="${o.id}" required><span class="option-letter">${String.fromCharCode(65 + i)}</span><code>${esc(o.text)}</code></label>`).join("")}</div>` : q.kind === "match" ? `<div class="match-rows">${q.rows!.map((r, i) => `<label><span>${esc(r)}</span><select id="match-${i}" required><option value="">Pilih pasangan…</option>${q.options.map((o) => `<option value="${o.id}">${esc(o.text)}</option>`).join("")}</select></label>`).join("")}</div>` : `<div class="order-chosen" aria-live="polite">${(answer as string[]).length ? (answer as string[]).map((id, i) => `<span><b>${i + 1}</b>${esc(q.options.find((o) => o.id === id)!.text)}</span>`).join("") : '<span class="muted">Urutan pilihanmu akan muncul di sini.</span>'}</div><div class="order-options">${q.options.map((o) => `<button type="button" data-order="${o.id}" ${(answer as string[]).includes(o.id) ? "disabled" : ""}>${esc(o.text)} <span>+</span></button>`).join("")}</div><button id="reset-order" type="button" class="text-btn">Reset urutan</button>`}<div class="quiz-submit">${q.number === 1 ? "<p>Hanya jawaban pertama yang dihitung skor. Periksa dulu sebelum kirim.</p>" : "<p>Baca ulang sebelum kirim.</p>"}<button class="primary" id="send-answer" type="submit">Kirim jawaban ${icon("arrow", 18)}</button></div><p class="error" id="quiz-error" role="alert"></p></form>`,
       true,
       true,
       "analysis",
@@ -1339,7 +1353,7 @@ async function submitQuiz(q: Question, answer: Answer) {
     showFeedback(feedback);
   } catch (e) {
     modal(
-      `${header("JAWABAN BELUM TERSIMPAN", "Sambungkan lagi koneksinya.", false)}<p class="error">${esc((e as Error).message)}</p><p>Jawaban lo aman. Kirim ulang jawaban yang sama setelah koneksi balik.</p><button id="retry-answer" class="primary">Kirim ulang jawaban ${icon("arrow", 18)}</button>`,
+      `${header("JAWABAN BELUM TERSIMPAN", "Sambungkan lagi koneksinya.", false)}<p class="error">${esc((e as Error).message)}</p><p>Jawaban kamu aman. Kirim ulang jawaban yang sama setelah koneksi balik.</p><button id="retry-answer" class="primary">Kirim ulang jawaban ${icon("arrow", 18)}</button>`,
       false,
     );
     bind("retry-answer", () => void submitQuiz(q, answer));
@@ -1375,7 +1389,7 @@ function showFeedback(f: Feedback) {
     .join(" ");
   const step = nextStep(state!);
   modal(
-    `${header(`ANALISIS LARAVEL ${f.question.number} / 8 · SELESAI`, f.correct ? "Analisis lo nyambung." : "Cek lagi sambungannya.", false)}<p class="analysis-reaction">Detektif: “${f.correct ? "Sambungannya pas. Sekarang kita baca buktinya." : "Gue perlu benerin sambungan ini. Petunjuknya tetap bisa kita periksa."}”</p><span class="score-pill ${f.correct ? "good" : ""}">${f.correct ? "+12,5 poin" : "Skor +0 · kasus tetap lanjut"}</span><details class="feedback-learning" ${f.correct ? "" : "open"}><summary>${f.correct ? "Ulas konsep Laravel" : "Kenapa jawabanmu belum tepat?"}</summary><p>${esc(f.explanation)}</p><pre>${esc(expectedText(f))}</pre></details><section class="discovered-proof"><p class="eyebrow">Bukti baru · ${esc(ev.title)}</p><p>${esc(ev.description)}</p><strong>${esc(meaning)}</strong></section><div class="next-lead"><p class="eyebrow">Berikutnya · ${esc(places[step.place].name)}</p><p>${esc(step.detail)}</p></div><div class="actions"><button id="feedback-next" class="primary">Balik ke kasus ${icon("arrow", 18)}</button><button id="stay-scene" class="secondary">Balik ke ruangan</button></div>`,
+    `${header(`ANALISIS LARAVEL ${f.question.number} / 8 · SELESAI`, f.correct ? "Analisis kamu nyambung." : "Cek lagi sambungannya.", false)}<p class="analysis-reaction">Detektif: “${f.correct ? "Sambungannya pas. Sekarang kita baca buktinya." : "Saya perlu memperbaiki sambungan ini. Petunjuknya tetap bisa kita periksa."}”</p><span class="score-pill ${f.correct ? "good" : ""}">${f.correct ? "+12,5 poin" : "Skor +0 · kasus tetap lanjut"}</span><details class="feedback-learning" ${f.correct ? "" : "open"}><summary>${f.correct ? "Ulas konsep Laravel" : "Kenapa jawabanmu belum tepat?"}</summary><p>${esc(f.explanation)}</p><pre>${esc(expectedText(f))}</pre></details><section class="discovered-proof"><p class="eyebrow">Bukti baru · ${esc(ev.title)}</p><p>${esc(ev.description)}</p><strong>${esc(meaning)}</strong></section><div class="next-lead"><p class="eyebrow">Berikutnya · ${esc(places[step.place].name)}</p><p>${esc(step.detail)}</p></div><div class="actions"><button id="feedback-next" class="primary">Balik ke kasus ${icon("arrow", 18)}</button><button id="stay-scene" class="secondary">Balik ke ruangan</button></div>`,
     false,
     true,
     "analysis",
@@ -1410,7 +1424,7 @@ function hints() {
         )
         .join(
           "",
-        )}</div><button id="next-hint" class="primary" ${level >= solutions.length ? "disabled" : ""}>${level >= solutions.length ? "Semua arahan sudah terbuka" : "Buka petunjuk " + (level + 1)} ${icon("arrow", 18)}</button><p class="muted">Bantuan ini nggak ngurangin skor.</p><details class="shortcuts"><summary>Shortcut</summary><p>J · Catatan<br>H · Petunjuk<br>P · Jeda<br>O · Daftar objek<br>B · Papan bukti<br>L · Pindah lokasi<br>Spasi · Lengkapi / lanjut dialog<br>Esc · Tutup panel</p></details>`,
+        )}</div><button id="next-hint" class="primary" ${level >= solutions.length ? "disabled" : ""}>${level >= solutions.length ? "Semua arahan sudah terbuka" : "Buka petunjuk " + (level + 1)} ${icon("arrow", 18)}</button><p class="muted">Bantuan ini tidak mengurangi skor.</p><details class="shortcuts"><summary>Shortcut</summary><p>J · Catatan<br>H · Petunjuk<br>P · Jeda<br>O · Daftar objek<br>B · Papan bukti<br>L · Pindah lokasi<br>Spasi · Lengkapi / lanjut dialog<br>Esc · Tutup panel</p></details>`,
       true,
       false,
       "drawer",
@@ -1435,13 +1449,13 @@ function conclusion() {
     dialogue([
       {
         who: "Detektif",
-        text: "Sebelum menyimpulkan, gue perlu mendengar langsung cerita Yono dan memeriksa daftar kiriman di ruangan ini.",
+        text: "Sebelum menyimpulkan, saya perlu mendengar langsung cerita Yono dan memeriksa daftar kiriman di ruangan ini.",
       },
     ]);
     return;
   }
   modal(
-    `${header("REKONSTRUKSI KASUS", "Hubungkan tiga hal terakhir.")}<p>Rangkai kejadian dari bukti lo. Bagian ini nggak ngubah skor Laravel.</p><form id="conclusion-form"><label>Siapa yang mengalihkan kiriman?<select id="deduce-who" required><option value="">Pilih orang…</option><option value="wiwo">Wiwo</option><option value="tedar">Tedar</option><option value="noah">Noah</option><option value="allie">Allie</option></select></label><label>Bagaimana paket sampai ke kantor tanpa Yono lewat lobi?<select id="deduce-route" required><option value="">Pilih jalur…</option><option value="exit">Pintu utama gedung</option><option value="service">Akses dan tangga servis</option><option value="ghost">Lantai supernatural</option></select></label><label>Apa yang ingin ditutupi pelakunya?<select id="deduce-motive" required><option value="">Pilih motif…</option><option value="renovation">Jadwal renovasi biasa</option><option value="parcels">Pengalihan kiriman yang tercatat diterima</option><option value="prank">Lelucon untuk Wiwo</option></select></label><p id="deduce-error" class="error" role="alert"></p><button class="primary" type="submit">Sampaikan kesimpulan ${icon("arrow", 18)}</button></form>`,
+    `${header("REKONSTRUKSI KASUS", "Hubungkan tiga hal terakhir.")}<p>Rangkai kejadian dari bukti kamu. Bagian ini tidak mengubah skor Laravel.</p><form id="conclusion-form"><label>Siapa yang mengalihkan kiriman?<select id="deduce-who" required><option value="">Pilih orang…</option><option value="wiwo">Wiwo</option><option value="tedar">Tedar</option><option value="noah">Noah</option><option value="allie">Allie</option></select></label><label>Bagaimana paket sampai ke kantor tanpa Yono lewat lobi?<select id="deduce-route" required><option value="">Pilih jalur…</option><option value="exit">Pintu utama gedung</option><option value="service">Akses dan tangga servis</option><option value="ghost">Lantai supernatural</option></select></label><label>Apa yang ingin ditutupi pelakunya?<select id="deduce-motive" required><option value="">Pilih motif…</option><option value="renovation">Jadwal renovasi biasa</option><option value="parcels">Pengalihan kiriman yang tercatat diterima</option><option value="prank">Lelucon untuk Wiwo</option></select></label><p id="deduce-error" class="error" role="alert"></p><button class="primary" type="submit">Sampaikan kesimpulan ${icon("arrow", 18)}</button></form>`,
   );
   $("conclusion-form").addEventListener("submit", (e) => {
     e.preventDefault();
@@ -1464,7 +1478,7 @@ function conclusion() {
 }
 function settings() {
   modal(
-    `${header("JEDA / PENGATURAN", "Jeda dulu.")}<div class="audio-settings">${(["master", "music", "ambience", "effects", "voice"] as const).map((k, i) => `<label><span>${["Volume utama", "Musik noir", "Suasana ruangan", "Efek suara", "Pesan suara"][i]}</span><input type="range" id="volume-${k}" min="0" max="100" value="${Math.round(audio.levels[k] * 100)}" aria-label="${["Volume utama", "Musik", "Ambience", "Efek", "Suara dialog"][i]}"><output id="value-${k}">${Math.round(audio.levels[k] * 100)}%</output></label>`).join("")}</div><label class="toggle"><input id="spoken" type="checkbox" ${audio.levels.spoken ? "checked" : ""}> Aktifkan pesan suara Yono dan pengumuman lift</label><p class="muted">Dialog lain berupa teks. Tanpa suara pun, semua petunjuk kebaca.</p><label class="toggle"><input id="motion" type="checkbox" ${reduced ? "checked" : ""} ${motionMedia?.matches ? "disabled" : ""}> Kurangi animasi</label><div class="actions"><button id="test-audio" class="secondary">Tes suara</button>${state ? '<button id="replay-scene" class="secondary">Lihat ulang ruangan</button><button id="return-menu" class="secondary">Simpan dan keluar</button>' : ""}<button id="continue-game" class="primary">Lanjut main</button></div>`,
+    `${header("JEDA / PENGATURAN", "Jeda dulu.")}<div class="audio-settings">${(["master", "music", "ambience", "effects", "voice"] as const).map((k, i) => `<label><span>${["Volume utama", "Musik noir", "Suasana ruangan", "Efek suara", "Pengumuman lift"][i]}</span><input type="range" id="volume-${k}" min="0" max="100" value="${Math.round(audio.levels[k] * 100)}" aria-label="${["Volume utama", "Musik", "Ambience", "Efek", "Suara dialog"][i]}"><output id="value-${k}">${Math.round(audio.levels[k] * 100)}%</output></label>`).join("")}</div><label class="toggle"><input id="typing-sound" type="checkbox" ${audio.levels.typing ? "checked" : ""}> Suara ketikan</label><label class="toggle"><input id="spoken" type="checkbox" ${audio.levels.spoken ? "checked" : ""}> Aktifkan suara pengumuman lift</label><p class="muted">Dialog lain berupa teks. Tanpa suara pun, semua petunjuk kebaca.</p><label class="toggle"><input id="motion" type="checkbox" ${reduced ? "checked" : ""} ${motionMedia?.matches ? "disabled" : ""}> Kurangi animasi</label><div class="actions"><button id="test-audio" class="secondary">Tes suara</button>${state ? '<button id="replay-scene" class="secondary">Lihat ulang ruangan</button><button id="return-menu" class="secondary">Simpan dan keluar</button>' : ""}<button id="continue-game" class="primary">Lanjut main</button></div>`,
     true,
     false,
     "drawer",
@@ -1480,6 +1494,8 @@ function settings() {
       audio.setLevel(k, v / 100);
       $("value-" + k).textContent = v + "%";
     };
+  $<HTMLInputElement>("typing-sound").onchange = (e) =>
+    audio.setLevel("typing", (e.target as HTMLInputElement).checked);
   $<HTMLInputElement>("spoken").onchange = (e) =>
     audio.setLevel("spoken", (e.target as HTMLInputElement).checked);
   $<HTMLInputElement>("motion").onchange = (e) => {

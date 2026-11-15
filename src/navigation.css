@@ -1,0 +1,130 @@
+/* Small navigation controls; story and progression remain in their existing modules. */
+button.scene-objective {
+  pointer-events: auto;
+  cursor: pointer;
+  text-align: left;
+  min-height: 44px;
+  font: 16px/1.45 var(--sans, sans-serif);
+}
+.scene-objective:hover {
+  border-left-color: #fff1cf;
+  background: #152e2a;
+}
+.scene-objective:focus-visible {
+  outline: 2px solid #ffe0a5;
+  outline-offset: 4px;
+}
+.objective-thought {
+  display: block;
+  font: italic 16px/1.4 var(--serif);
+  color: #e0decf;
+  margin-bottom: 3px;
+}
+.objective-action {
+  display: block;
+  color: #f9e2b7;
+}
+@media (max-width: 600px) {
+  button.scene-objective {
+    font-size: 14px;
+    padding: 8px 12px;
+  }
+  .objective-thought {
+    font-size: 14px;
+  }
+}
+
+.analysis-label {
+  display: block;
+  margin: 0 0 9px;
+  font-size: 13px;
+  color: #d5dfd1;
+}
+#floor-panel .floor-buttons {
+  grid-template-columns: repeat(2, 36px);
+  gap: 4px;
+}
+.analysis-mark {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 28px;
+  border-bottom: 2px solid #65756c;
+  color: #b0bdb2;
+  font-size: 13px;
+  cursor: default;
+}
+.analysis-mark.is-done {
+  border-color: #a6bca1;
+  color: #d4e4cb;
+}
+.analysis-mark.is-current {
+  border-color: #e6c18d;
+  color: #ffe0a5;
+}
+.analysis-mark:focus-visible {
+  outline: 2px solid #ffe0a5;
+  outline-offset: 2px;
+}
+@media (max-width: 600px) {
+  #floor-panel {
+    padding: 9px 12px;
+    background: #122323eb;
+  }
+  #floor-panel .analysis-label {
+    margin: 0;
+  }
+  #floor-toggle {
+    width: auto;
+    height: auto;
+    min-height: 30px;
+    border: 0;
+    font-size: 12px;
+    text-decoration: underline;
+  }
+  #floor-panel .floor-buttons {
+    display: none;
+  }
+  .floors-mobile {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .floors-mobile .floor-wrap {
+    padding-bottom: 0;
+  }
+  .floors-mobile .floor-tooltip {
+    position: static;
+    display: block;
+    visibility: visible;
+    opacity: 1;
+    transform: none;
+    white-space: normal;
+    background: transparent;
+    padding: 8px 0;
+  }
+}
+/* Decorative hit areas remain focusable and available in Daftar objek. */
+.scene-hotspot[data-kind="decor"]::before {
+  opacity: 0;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+.scene-hotspot[data-kind="decor"]:hover::before,
+.scene-hotspot[data-kind="decor"]:focus::before,
+.scene-hotspot[data-kind="decor"].is-target::before {
+  opacity: 0.8;
+}
+@media (prefers-reduced-motion: reduce) {
+  .scene-hotspot[data-kind="decor"]::before {
+    transition: none;
+  }
+}
+.reduced .scene-hotspot[data-kind="decor"]::before {
+  transition: none;
+}
+
+.place-switch-label {
+  font: 13px/1.2 var(--sans, sans-serif);
+  color: #f9e2b7;
+  border-bottom: 1px solid #c4b59188;
+}

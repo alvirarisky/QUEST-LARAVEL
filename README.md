@@ -27,7 +27,7 @@ Tanpa `.env` atau environment variable, server pengembangan membuat kunci sement
 
 ## Antarmuka versi 1.2
 
-Pembuka dua langkah mengantar lo ke pesan Yono dan cara main, dengan Lewati yang selalu tersedia. Ruangan memenuhi layar; cincin adalah interaksi utama. Nama objek muncul saat hover/fokus, lewat pengaturan Tampilkan nama objek, atau sebagai petunjuk interaksi pertama.
+Pembuka dua langkah mengantar kamu ke pesan Yono dan cara main, dengan Lewati yang selalu tersedia. Ruangan memenuhi layar; cincin adalah interaksi utama. Nama objek muncul saat hover/fokus, lewat pengaturan Tampilkan nama objek, atau sebagai petunjuk interaksi pertama.
 
 Klik nama lokasi di tengah header untuk pindah ke tempat yang sudah terbuka. Di layar sempit, kamera mengikuti objek aktif; objek di luar potongan gambar tetap bisa diakses lewat Daftar objek (O). Catatan (J), Petunjuk (H), dan Jeda (P) menjadi drawer; map bukti (B) membuka papan kasus. Panel lift menampilkan delapan konsep sesuai soal asli. Di HP, tombol lift membuka daftarnya.
 

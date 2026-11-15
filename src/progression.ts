@@ -58,7 +58,7 @@ export const steps: Step[] = [
     kind: "inspect",
     title: "Lihat Yono masuk lift.",
     detail:
-      "Denah cuma mencatat tujuh lantai. Rekaman kamera bisa menunjukkan perjalanan terakhirnya.",
+      "Denah hanya mencatat tujuh lantai. Rekaman kamera bisa menunjukkan perjalanan terakhirnya.",
     cta: "Periksa rekaman CCTV",
     complete: answered(3),
   },
@@ -91,7 +91,7 @@ export const steps: Step[] = [
     kind: "inspect",
     title: "Baca laporan perawatan.",
     detail:
-      "Noah meminta lo melihat laporan pada panel pemeriksaan. Cari pemberhentian yang tidak tercatat.",
+      "Noah meminta kamu melihat laporan pada panel pemeriksaan. Cari pemberhentian yang tidak tercatat.",
     cta: "Periksa laporan Noah",
     complete: answered(4),
   },

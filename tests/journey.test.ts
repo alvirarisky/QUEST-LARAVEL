@@ -35,7 +35,7 @@ const compiled = await build({
           loader: "js",
           contents:
             args.path === "audio"
-              ? `export const levels={master:.65,music:.36,ambience:.38,effects:.65,voice:.8,spoken:false};export async function unlock(){};export function setLevel(k,v){levels[k]=v};export function sfx(){};export function setTheme(){};export function setRoom(){};export function setTension(){};export function duck(){};export function speak(){};export function stopVoice(){};export function suspend(){};export function audioStatus(){return{}};`
+              ? `export const levels={master:.65,music:.36,ambience:.38,effects:.65,voice:.8,spoken:false,typing:true};export async function unlock(){};export function setLevel(k,v){levels[k]=v};export function sfx(){};export function typingSound(){};export function stopTypingSound(){};export function setTheme(){};export function setRoom(){};export function setTension(){};export function duck(){};export function speak(){};export function stopVoice(){};export function suspend(){};export function audioStatus(){return{}};`
               : `export function createWorld(parent,onInspect,onReady){const scene={reduced:false,inspect(h){onInspect(h)},loadPlace(){},setProgress(){},setFocus(){},lock(){},highlight(){return true}};setTimeout(onReady,0);return{scene,game:{destroy(){}}}}`,
         }));
       },
@@ -196,7 +196,7 @@ test("A newcomer can finish via the visible primary actions without guessing hid
       a.w.document.querySelector('[data-hotspot="cctv"]') as HTMLButtonElement
     ).click();
     assert.ok(a.q("modal")!.hidden);
-    assert.match(a.q("objective")!.textContent!, /Gue/);
+    assert.match(a.q("objective")!.textContent!, /Saya/);
     a.act();
     let ending = false,
       wrongEvidence = false,
@@ -400,4 +400,41 @@ test("Looking at decorative scenery changes no saved game state", async () => {
   } finally {
     a.dom.window.close();
   }
+});
+
+test("Objective is an accessible destination control and never opens a same-room interview", async () => {
+  const a = await app();
+  try {
+    await a.start();
+    const objective = a.q("objective")!;
+    assert.equal(objective.tagName, "BUTTON");
+    assert.match(objective.textContent!, /Allie.*·.*→/);
+    assert.match(objective.getAttribute("aria-label")!, /Sorot tujuan/);
+    const before = JSON.stringify(a.saved());
+    a.click("objective");
+    assert.ok(a.q("modal")!.hidden);
+    assert.equal(JSON.stringify(a.saved()), before);
+  } finally {
+    a.dom.window.close();
+  }
+});
+
+
+test("The two intro pages explain the missing courier, building anomaly and scoring", async () => {
+  const a = await app();
+  try {
+    a.field("name", "Audit Intro");
+    a.field("student", "INTRO-001");
+    a.field("kelas", "IT-TEST");
+    a.submit("identity-form");
+    await a.wait(() => !!a.q("brief-next"));
+    const intro = () => a.w.document.querySelector(".cinema-intro")!.textContent!;
+    for (const text of ["Gedung W", "7 lantai", "lantai 8"]) assert.ok(intro().includes(text), text);
+    a.click("brief-next");
+    for (const text of ["Tugas kamu", "12,5 poin"]) assert.ok(intro().includes(text), text);
+    assert.equal(a.q("typed-message")!.textContent, "Saya sudah lantai 8. Orangnya belum ada.");
+    a.click("brief-next");
+    await a.wait(() => !!a.q("objects-btn") && !!a.q("loading")?.hidden);
+    assert.equal(a.saved().run.answers.length, 0);
+  } finally { a.dom.window.close(); }
 });

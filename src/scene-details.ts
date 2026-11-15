@@ -22,7 +22,7 @@ export const decorations: Record<Place, Decoration[]> = {
       "Lampu meja",
       445,
       425,
-      "Cahaya kecil ini bikin meja resepsionis terasa seperti pulau.",
+      "Cahaya kecil ini membuat meja resepsionis terasa seperti pulau.",
     ),
     decor(
       "decor-lobby-plant",
@@ -75,14 +75,14 @@ export const decorations: Record<Place, Decoration[]> = {
       "Lemari piala",
       1110,
       280,
-      "Lemari ini penuh penghargaan, tapi nggak satu pun bisa menjawab pertanyaan gue.",
+      "Lemari ini penuh penghargaan, tapi tidak satu pun bisa menjawab pertanyaan saya.",
     ),
     decor(
       "decor-office-orchid",
       "Anggrek meja",
       175,
       430,
-      "Bunganya lebih terurus daripada jam tidur gue.",
+      "Bunganya lebih terurus daripada jam tidur saya.",
     ),
     decor(
       "decor-office-painting",
@@ -105,7 +105,7 @@ export const decorations: Record<Place, Decoration[]> = {
       "Pipa servis",
       650,
       125,
-      "Dari dekat, suara pipa ini cuma dengung biasa.",
+      "Dari dekat, suara pipa ini hanya dengung biasa.",
     ),
     decor(
       "decor-service-toolbox",
