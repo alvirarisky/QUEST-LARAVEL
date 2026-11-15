@@ -2,6 +2,7 @@ import "./style.css";
 import "./cinematic.css";
 import "./moments.css";
 import "./living-world.css";
+import "./navigation.css";
 import {
   sceneObjects,
   isDecoration,
@@ -308,18 +309,38 @@ function dialogue(lines: Line[], after?: () => void) {
     };
     if (reduced) finish();
     else {
-      const timer = setInterval(() => {
+      let timer: ReturnType<typeof setTimeout>;
+      let letters = 0,
+        cadence = 2;
+      const typeNext = () => {
         if (!el.isConnected) {
-          clearInterval(timer);
+          audio.stopTypingSound();
           return;
         }
-        el.textContent = text.slice(0, ++n);
-        if (n >= text.length) {
-          clearInterval(timer);
-          complete = true;
+        const char = text[n++];
+        el.textContent = text.slice(0, n);
+        if (narration) {
+          if (n === 1 || (n % 20 === 0 && /\p{L}/u.test(char)))
+            audio.typingSound(l.who, true);
+        } else if (/\p{L}/u.test(char) && ++letters >= cadence) {
+          audio.typingSound(l.who);
+          letters = 0;
+          cadence = 2 + Math.floor(Math.random() * 2);
         }
-      }, 23);
-      stopTyping = () => clearInterval(timer);
+        if (n >= text.length) {
+          complete = true;
+          return;
+        }
+        timer = setTimeout(
+          typeNext,
+          /[.!?…]/.test(char) ? 210 : /[,;:]/.test(char) ? 105 : 23,
+        );
+      };
+      stopTyping = () => {
+        clearTimeout(timer);
+        audio.stopTypingSound();
+      };
+      timer = setTimeout(typeNext, 23);
     }
     bind("dialog-next", () => {
       if (!complete) {
@@ -523,7 +544,7 @@ async function resumeRun(saved: Save) {
   }
 }
 async function mountGame() {
-  app.innerHTML = `<main class="cinema-game"><div class="scene-stage"><div id="world"></div><div class="world-tint" aria-hidden="true"></div><div class="world-atmosphere" aria-hidden="true"><i class="atmosphere-dust"></i><i class="atmosphere-rain"></i><i class="light-haze"></i><i class="world-vignette"></i></div><div class="scene-scrim"></div><div id="loading" class="loading"><span class="loading-mark">D / 7</span><p>Ngebuka tempat kejadian…</p></div></div><header class="cinema-header"><button class="wordmark" id="brand-game" aria-label="Jeda permainan">D<span>/</span>7</button><span class="narrative-clock" id="narrative-clock" title="Waktu cerita fiksi, bukan batas waktu" aria-label="Jam cerita fiksi"></span><button class="place-heading" id="places-btn" aria-label="Pindah lokasi"><span id="location-heading"></span>${icon("location", 16)}</button><nav class="scene-tools" aria-label="Peralatan penyelidikan"><button id="objects-btn" aria-label="Daftar objek" title="Daftar objek">${icon("objects")}</button><button id="journal-btn" aria-label="Catatan" title="Catatan">${icon("notes")}</button><button id="hint-btn" aria-label="Petunjuk" title="Petunjuk">${icon("hint")}</button><button id="settings-btn" aria-label="Jeda" title="Jeda">${icon("pause")}</button><span class="player-avatar" id="player-name" title="Penyelidik">${portrait("Detektif")}</span></nav></header><p id="objective" class="scene-objective" role="status"></p><button id="evidence-btn" class="case-map-button" aria-label="Papan bukti">${icon("map")}<span id="evidence-count"></span></button><div id="floor-panel"></div></main>${common}`;
+  app.innerHTML = `<main class="cinema-game"><div class="scene-stage"><div id="world"></div><div class="world-tint" aria-hidden="true"></div><div class="world-atmosphere" aria-hidden="true"><i class="atmosphere-dust"></i><i class="atmosphere-rain"></i><i class="light-haze"></i><i class="world-vignette"></i></div><div class="scene-scrim"></div><div id="loading" class="loading"><span class="loading-mark">D / 7</span><p>Ngebuka tempat kejadian…</p></div></div><header class="cinema-header"><button class="wordmark" id="brand-game" aria-label="Jeda permainan">D<span>/</span>7</button><span class="narrative-clock" id="narrative-clock" title="Waktu cerita fiksi, bukan batas waktu" aria-label="Jam cerita fiksi"></span><button class="place-heading" id="places-btn" aria-label="Pindah lokasi"><span id="location-heading"></span>${icon("location", 16)}<span class="place-switch-label">Pindah</span></button><nav class="scene-tools" aria-label="Peralatan penyelidikan"><button id="objects-btn" aria-label="Daftar objek" title="Daftar objek">${icon("objects")}</button><button id="journal-btn" aria-label="Catatan" title="Catatan">${icon("notes")}</button><button id="hint-btn" aria-label="Petunjuk" title="Petunjuk">${icon("hint")}</button><button id="settings-btn" aria-label="Jeda" title="Jeda">${icon("pause")}</button><span class="player-avatar" id="player-name" title="Penyelidik">${portrait("Detektif")}</span></nav></header><button type="button" id="objective" class="scene-objective"></button><button id="evidence-btn" class="case-map-button" aria-label="Papan bukti">${icon("map")}<span id="evidence-count"></span></button><div id="floor-panel"></div></main>${common}`;
   bind("journal-btn", journal);
   bind("hint-btn", hints);
   bind("settings-btn", settings);
@@ -531,6 +552,7 @@ async function mountGame() {
   bind("evidence-btn", evidenceList);
   bind("objects-btn", objectList);
   bind("places-btn", locationList);
+  bind("objective", goNext);
   $("player-name").title = state!.run.identity.name;
   $("player-name").textContent = state!.run.identity.name
     .trim()
@@ -650,7 +672,12 @@ function goNext() {
     return;
   }
   const h = places[step.place].hotspots.find((h) => h.id === step.hotspot);
-  if (h) world?.inspect(h);
+  if (h) {
+    world?.setFocus(h.id);
+    document
+      .querySelector<HTMLButtonElement>(`[data-scene-object="${h.id}"]`)
+      ?.focus({ preventScroll: true });
+  }
 }
 const detectiveThoughts: Record<string, string> = {
   "meet-allie": "Gue mulai dari orang yang melihat Yono datang.",
@@ -694,12 +721,12 @@ function renderHUD() {
   const step = nextStep(state);
   const thought =
     sceneThought?.step === step.id ? sceneThought.text : undefined;
-  $("objective").textContent =
-    thought ||
-    (state.location === step.place
-      ? step.title
-      : `${step.title} ${places[step.place].name}.`);
-  $("objective").classList.toggle("detective-thought", !!thought);
+  $("objective").innerHTML =
+    `${thought ? `<span class="objective-thought">${esc(thought)}</span>` : ""}<span class="objective-action">${esc(step.title)} · ${esc(places[step.place].name)} →</span>`;
+  $("objective").setAttribute(
+    "aria-label",
+    `${step.title} · ${places[step.place].name}. ${state.location === step.place ? "Sorot tujuan" : "Pindah lokasi"}`,
+  );
   $("location-heading").textContent = places[state.location].name;
   if ($("narrative-clock")) {
     $("narrative-clock").textContent = narrativeTime(availablePlaces(state));
@@ -720,9 +747,8 @@ function renderHUD() {
 
   $("evidence-count").textContent = String(state.clues.length);
   $("floor-panel").innerHTML =
-    `<button id="floor-toggle" aria-label="Panel lift, progres Laravel">${icon("lift")}</button><div class="floor-buttons" aria-label="Progres analisis Laravel">${floorsMarkup()}</div>`;
+    `<span class="analysis-label">Analisis ${done()}/8</span><button id="floor-toggle" aria-label="Lihat progres analisis ${done()} dari 8">Rincian</button><div class="floor-buttons" role="list" aria-label="Progres analisis Laravel">${floorsMarkup()}</div>`;
   bind("floor-toggle", floorList);
-  bindFloors();
   audio.setTension(done() >= 7 ? 0.85 : done() >= 5 ? 0.5 : 0.1);
   audio.setTheme(done() >= 7 ? "reveal" : "explore");
   world?.setProgress(done());
@@ -927,41 +953,20 @@ function journal() {
 }
 function floorsMarkup() {
   return challengeNotes
-    .map(
-      (n, i) =>
-        `<span class="floor-wrap"><button data-floor="${i}" class="floor-button ${i < done() ? "floor-done" : i === done() ? "floor-active" : ""}" aria-label="${i + 1}. ${esc(n.concept)}${i < done() ? ", selesai" : i === done() ? ", analisis berikutnya" : ", belum terbuka"}" ${i > done() ? "disabled" : ""}><span>${i + 1}</span>${i === 7 && done() < 7 ? icon("lock", 12) : ""}</button><span class="floor-tooltip">${esc(n.concept)}${i < done() ? " · selesai" : ""}</span></span>`,
-    )
+    .map((n, i) => {
+      const status =
+        i < done() ? "selesai" : i === done() ? "berikutnya" : "belum terbuka";
+      return `<span class="floor-wrap" role="listitem"><span tabindex="0" class="analysis-mark ${i < done() ? "is-done" : i === done() ? "is-current" : ""}" aria-label="${i + 1}. ${esc(n.concept)}, ${status}">${i < done() ? "✓" : i + 1}</span><span class="floor-tooltip">${esc(n.concept)} · ${status}</span></span>`;
+    })
     .join("");
-}
-function bindFloors() {
-  document.querySelectorAll<HTMLButtonElement>("[data-floor]").forEach(
-    (b) =>
-      (b.onclick = () => {
-        const i = Number(b.dataset.floor),
-          n = challengeNotes[i];
-        if (i < done()) {
-          const f = state!.reviews.find((f) => f.question.number === i + 1);
-          if (f) {
-            modal(
-              `${header("Analisis selesai", n.concept)}<p>${esc(f.explanation)}</p><pre>${esc(expectedText(f))}</pre>`,
-            );
-            return;
-          }
-        }
-        modal(
-          `${header("Analisis berikutnya", n.concept)}<p>${esc(n.why)}</p><p>${esc(nextStep(state!).detail)}</p>`,
-        );
-      }),
-  );
 }
 function floorList() {
   modal(
-    `${header("Panel lift", "Delapan sambungan")}<div class="floors-mobile">${floorsMarkup()}</div>`,
+    `${header("Progres Laravel", `Analisis ${done()}/8`)}<div class="floors-mobile" role="list">${floorsMarkup()}</div>`,
     true,
     false,
     "drawer",
   );
-  bindFloors();
 }
 function openPerson(id: Person) {
   if (id === "yono") {
@@ -1464,7 +1469,7 @@ function conclusion() {
 }
 function settings() {
   modal(
-    `${header("JEDA / PENGATURAN", "Jeda dulu.")}<div class="audio-settings">${(["master", "music", "ambience", "effects", "voice"] as const).map((k, i) => `<label><span>${["Volume utama", "Musik noir", "Suasana ruangan", "Efek suara", "Pesan suara"][i]}</span><input type="range" id="volume-${k}" min="0" max="100" value="${Math.round(audio.levels[k] * 100)}" aria-label="${["Volume utama", "Musik", "Ambience", "Efek", "Suara dialog"][i]}"><output id="value-${k}">${Math.round(audio.levels[k] * 100)}%</output></label>`).join("")}</div><label class="toggle"><input id="spoken" type="checkbox" ${audio.levels.spoken ? "checked" : ""}> Aktifkan pesan suara Yono dan pengumuman lift</label><p class="muted">Dialog lain berupa teks. Tanpa suara pun, semua petunjuk kebaca.</p><label class="toggle"><input id="motion" type="checkbox" ${reduced ? "checked" : ""} ${motionMedia?.matches ? "disabled" : ""}> Kurangi animasi</label><div class="actions"><button id="test-audio" class="secondary">Tes suara</button>${state ? '<button id="replay-scene" class="secondary">Lihat ulang ruangan</button><button id="return-menu" class="secondary">Simpan dan keluar</button>' : ""}<button id="continue-game" class="primary">Lanjut main</button></div>`,
+    `${header("JEDA / PENGATURAN", "Jeda dulu.")}<div class="audio-settings">${(["master", "music", "ambience", "effects", "voice"] as const).map((k, i) => `<label><span>${["Volume utama", "Musik noir", "Suasana ruangan", "Efek suara", "Pesan suara"][i]}</span><input type="range" id="volume-${k}" min="0" max="100" value="${Math.round(audio.levels[k] * 100)}" aria-label="${["Volume utama", "Musik", "Ambience", "Efek", "Suara dialog"][i]}"><output id="value-${k}">${Math.round(audio.levels[k] * 100)}%</output></label>`).join("")}</div><label class="toggle"><input id="typing-sound" type="checkbox" ${audio.levels.typing ? "checked" : ""}> Suara ketikan</label><label class="toggle"><input id="spoken" type="checkbox" ${audio.levels.spoken ? "checked" : ""}> Aktifkan pesan suara Yono dan pengumuman lift</label><p class="muted">Dialog lain berupa teks. Tanpa suara pun, semua petunjuk kebaca.</p><label class="toggle"><input id="motion" type="checkbox" ${reduced ? "checked" : ""} ${motionMedia?.matches ? "disabled" : ""}> Kurangi animasi</label><div class="actions"><button id="test-audio" class="secondary">Tes suara</button>${state ? '<button id="replay-scene" class="secondary">Lihat ulang ruangan</button><button id="return-menu" class="secondary">Simpan dan keluar</button>' : ""}<button id="continue-game" class="primary">Lanjut main</button></div>`,
     true,
     false,
     "drawer",
@@ -1480,6 +1485,8 @@ function settings() {
       audio.setLevel(k, v / 100);
       $("value-" + k).textContent = v + "%";
     };
+  $<HTMLInputElement>("typing-sound").onchange = (e) =>
+    audio.setLevel("typing", (e.target as HTMLInputElement).checked);
   $<HTMLInputElement>("spoken").onchange = (e) =>
     audio.setLevel("spoken", (e.target as HTMLInputElement).checked);
   $<HTMLInputElement>("motion").onchange = (e) => {

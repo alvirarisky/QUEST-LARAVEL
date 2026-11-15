@@ -35,7 +35,7 @@ const compiled = await build({
           loader: "js",
           contents:
             args.path === "audio"
-              ? `export const levels={master:.65,music:.36,ambience:.38,effects:.65,voice:.8,spoken:false};export async function unlock(){};export function setLevel(k,v){levels[k]=v};export function sfx(){};export function setTheme(){};export function setRoom(){};export function setTension(){};export function duck(){};export function speak(){};export function stopVoice(){};export function suspend(){};export function audioStatus(){return{}};`
+              ? `export const levels={master:.65,music:.36,ambience:.38,effects:.65,voice:.8,spoken:false,typing:true};export async function unlock(){};export function setLevel(k,v){levels[k]=v};export function sfx(){};export function typingSound(){};export function stopTypingSound(){};export function setTheme(){};export function setRoom(){};export function setTension(){};export function duck(){};export function speak(){};export function stopVoice(){};export function suspend(){};export function audioStatus(){return{}};`
               : `export function createWorld(parent,onInspect,onReady){const scene={reduced:false,inspect(h){onInspect(h)},loadPlace(){},setProgress(){},setFocus(){},lock(){},highlight(){return true}};setTimeout(onReady,0);return{scene,game:{destroy(){}}}}`,
         }));
       },
@@ -397,6 +397,23 @@ test("Looking at decorative scenery changes no saved game state", async () => {
     assert.equal(JSON.stringify(a.saved()), before);
     assert.match(a.q("objective")!.textContent!, /Detiknya/);
     assert.equal(a.q("narrative-clock")!.textContent, "07.42");
+  } finally {
+    a.dom.window.close();
+  }
+});
+
+test("Objective is an accessible destination control and never opens a same-room interview", async () => {
+  const a = await app();
+  try {
+    await a.start();
+    const objective = a.q("objective")!;
+    assert.equal(objective.tagName, "BUTTON");
+    assert.match(objective.textContent!, /Allie.*·.*→/);
+    assert.match(objective.getAttribute("aria-label")!, /Sorot tujuan/);
+    const before = JSON.stringify(a.saved());
+    a.click("objective");
+    assert.ok(a.q("modal")!.hidden);
+    assert.equal(JSON.stringify(a.saved()), before);
   } finally {
     a.dom.window.close();
   }
