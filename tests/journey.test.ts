@@ -196,7 +196,7 @@ test("A newcomer can finish via the visible primary actions without guessing hid
       a.w.document.querySelector('[data-hotspot="cctv"]') as HTMLButtonElement
     ).click();
     assert.ok(a.q("modal")!.hidden);
-    assert.match(a.q("objective")!.textContent!, /Gue/);
+    assert.match(a.q("objective")!.textContent!, /Saya/);
     a.act();
     let ending = false,
       wrongEvidence = false,
@@ -417,4 +417,24 @@ test("Objective is an accessible destination control and never opens a same-room
   } finally {
     a.dom.window.close();
   }
+});
+
+
+test("The two intro pages explain the missing courier, building anomaly and scoring", async () => {
+  const a = await app();
+  try {
+    a.field("name", "Audit Intro");
+    a.field("student", "INTRO-001");
+    a.field("kelas", "IT-TEST");
+    a.submit("identity-form");
+    await a.wait(() => !!a.q("brief-next"));
+    const intro = () => a.w.document.querySelector(".cinema-intro")!.textContent!;
+    for (const text of ["Gedung W", "7 lantai", "lantai 8"]) assert.ok(intro().includes(text), text);
+    a.click("brief-next");
+    for (const text of ["Tugas kamu", "12,5 poin"]) assert.ok(intro().includes(text), text);
+    assert.equal(a.q("typed-message")!.textContent, "Saya sudah lantai 8. Orangnya belum ada.");
+    a.click("brief-next");
+    await a.wait(() => !!a.q("objects-btn") && !!a.q("loading")?.hidden);
+    assert.equal(a.saved().run.answers.length, 0);
+  } finally { a.dom.window.close(); }
 });

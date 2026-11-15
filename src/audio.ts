@@ -337,7 +337,8 @@ export function sfx(
     | "correct"
     | "wrong"
     | "connect"
-    | "phone",
+    | "phone"
+    | "message",
 ) {
   if (!ctx || ctx.state !== "running") return;
   const t = ctx.currentTime;
@@ -377,8 +378,14 @@ export function sfx(
     note(440, t + 0.12, 0.7, 0.09, "effects");
     hiss(t, 0.12, 0.04, 2500);
   }
-  if (kind === "phone") {
+  if (kind === "phone" || kind === "message") {
     [0, 0.19].forEach((d) => note(880, t + d, 0.15, 0.1, "effects"));
+  }
+  if (kind === "message") {
+    [0, 0.16].forEach((d) => {
+      note(110, t + d, 0.085, 0.045, "effects", "triangle");
+      hiss(t + d, 0.07, 0.018, 280);
+    });
   }
 }
 export function stopVoice() {
@@ -388,7 +395,7 @@ export function stopVoice() {
     voiceEl = undefined;
   }
 }
-export function speak(file: "yono-message" | "lift-seven") {
+export function speak(file: "lift-seven") {
   stopVoice();
   if (!levels.spoken || hidden) return;
   voiceEl = new Audio("/audio/" + file + ".mp3");
