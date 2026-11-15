@@ -44,6 +44,25 @@ export const people: Record<
       "Akhirnya. Gue kira orang satu gedung udah pulang. Ponsel gue mati sejak tadi malam.",
   },
 };
+/** Two additional character lines, read with the existing first testimony. */
+export const witnessFlavor: Record<Exclude<Person, "yono">, string[]> = {
+  allie: [
+    "[Allie membalik ponselnya; telapaknya menutupi layar.]",
+    "Chat pribadi gue nggak perlu dibuka, kan? Itu bukan urusan kiriman.",
+  ],
+  noah: [
+    "[Noah menahan gantungan kunci di saku, ibu jarinya mengetuk logam.]",
+    "Jangan langsung curiga sama yang bawa kunci. Teknisi paling gampang dijadiin jawaban.",
+  ],
+  wiwo: [
+    "[Wiwo merapikan map yang sudah lurus, lalu melirik pintu.]",
+    "Bisa aja gudang yang salah catat. Jangan nama gue dulu yang dibawa keluar.",
+  ],
+  tedar: [
+    "[Tedar meratakan ujung lengan bajunya sebelum mengulang jam pulang.]",
+    "Teknisi masih bisa mondar-mandir, kan? Tanya Noah dulu sebelum lo curiga ke staf kantor.",
+  ],
+};
 export const accessEvents = [
   { time: "20.15", detail: "mengaktifkan pemberhentian servis untuk lift" },
   { time: "20.18", detail: "membuka pintu arsip" },
@@ -85,7 +104,7 @@ export const evidence: Record<string, Evidence> = {
     title: "Pesan terakhir Yono",
     tag: "20.16 / PESAN",
     description:
-      "Rekan Yono menerima pesan setelah ia masuk lift. Tidak ada kabar lagi setelah itu.",
+      "Rekan Yono menerima pesan setelah ia masuk lift. Setelah pesan 20.16, Yono tidak membalas lagi. Sebelum penyelidikan dimulai, foto sebuah ruangan penuh rak juga masuk dari nomor tanpa nama; pengirimnya belum jelas.",
     quote: "“Gue udah lantai 8. Orangnya belum ada.”",
     frame: 2,
   },
@@ -94,7 +113,7 @@ export const evidence: Record<string, Evidence> = {
     title: "Buku tamu",
     tag: "20.12 / LOBI",
     description:
-      "Yono, kiriman YN07, tujuan kantor Wiwo. Kolom penerima kosong. Catatan di sisi halaman: “Tedar — tunggu di atas”.",
+      "Yono, kiriman YN07, tujuan kantor Wiwo. Kolom penerima kosong. Catatan di sisi halaman: “Tedar — tunggu di atas”. Di bawahnya ada tulisan lebih tipis: “Simpan salinannya.” Bagian ini tidak bertanda nama.",
     frame: 8,
   },
   plan: {
@@ -126,7 +145,7 @@ export const evidence: Record<string, Evidence> = {
     title: "Foto pengiriman",
     tag: "20.16 / FOTO YONO",
     description:
-      "Pantulan di pintu lift memperlihatkan tlo arsip lama “8” dan rak paket. Itu bukan koridor kantor Wiwo. Foto menguatkan bahwa Yono benar-benar mencapai area servis.",
+      "Pantulan di pintu lift memperlihatkan tanda arsip lama “8” dan rak paket. Itu bukan koridor kantor Wiwo. Foto menguatkan bahwa Yono benar-benar mencapai area servis.",
     frame: 2,
   },
   parcel: {
@@ -157,7 +176,7 @@ export const evidence: Record<string, Evidence> = {
     title: "Daftar kiriman asli",
     tag: "ARSIP / BUKTI PENGUAT",
     description:
-      "Nomor kiriman pada daftar asli cocok dengan paket-paket yang masih ditumpuk di ruangan ini. Daftar bertlo inisial TD. Ini menguatkan audit Wiwo, kesaksian Yono, dan catatan kartu Tedar.",
+      "Nomor kiriman pada daftar asli cocok dengan paket-paket yang masih ditumpuk di ruangan ini. Daftar bertanda inisial TD. Ini menguatkan audit Wiwo, kesaksian Yono, dan catatan kartu Tedar. Di lipatan belakang, tulisan lebih tipis mengulang “Simpan salinannya”, tanpa nama lain.",
     frame: 6,
   },
 };
@@ -259,19 +278,27 @@ export const rewardLines: Line[][] = [
   [
     {
       who: "Detektif",
-      text: "Nama Yono ada. Nama penerimanya kosong. Tapi kenapa ada nama Tedar di sisi halaman?",
+      text: "Kenapa nama Tedar justru ditulis di pinggir?",
+    },
+    {
+      who: "Yono",
+      text: "[Arsip chat malam kejadian · 20.10; diteruskan rekannya pagi ini] “Bilang ke rumah gue pulang habis kiriman ini, ya. Nasinya jangan dibuang dulu.”",
     },
   ],
   [
     {
       who: "Detektif",
-      text: "Tujuh lantai. Ada stiker menutup bagian denah di atas lantai tujuh. Lebih baik tanya teknisinya.",
+      text: "Apa yang sengaja ditutup stiker itu?",
+    },
+    {
+      who: "Yono",
+      text: "[Arsip chat malam kejadian · 20.12; diteruskan rekannya pagi ini] “Penerimanya belum turun. Gue disuruh tunggu di atas. Jangan tinggalin chat dulu, ya.”",
     },
   ],
   [
     {
       who: "Detektif",
-      text: "Yono tidak keluar melalui lobi. Allie juga tidak berada di meja saat dia masuk lift. Keterangannya perlu diperiksa lagi.",
+      text: "Allie, lo yakin soal waktunya?",
     },
   ],
   [
@@ -279,11 +306,19 @@ export const rewardLines: Line[][] = [
       who: "Noah",
       text: "Ini laporan gue, sebelum Yono datang. Pemberhentian servis itu masih aktif. Yang bisa buka bukan semua orang.",
     },
+    {
+      who: "Yono",
+      text: "[Arsip chat malam kejadian · 20.14; diteruskan rekannya pagi ini] “Gue udah masuk lift. Sepi banget. Kalau chat gue putus, tungguin sebentar.”",
+    },
   ],
   [
     {
       who: "Detektif",
-      text: "Foto Yono menunjukkan tlo arsip lama. Lantai delapan bukan angka asal ketik. Dia sampai ke suatu tempat.",
+      text: "Yon, sebenarnya lo disuruh ketemu siapa?",
+    },
+    {
+      who: "Yono",
+      text: "[Arsip chat malam kejadian · 20.15; diteruskan rekannya pagi ini] “Gue mulai nggak enak. Ini masih jalur pengiriman biasa, kan?”",
     },
   ],
   [
@@ -293,13 +328,17 @@ export const rewardLines: Line[][] = [
     },
     {
       who: "Detektif",
-      text: "Jadi Yono membawa sesuatu yang bisa membongkar pengalihan kiriman.",
+      text: "Siapa yang takut daftar itu sampai ke tangan Wiwo?",
     },
   ],
   [
     {
       who: "Detektif",
-      text: "Kartu Tedar masih dipakai pukul 20.31. Dia bilang pulang jam delapan. Sekarang gue punya alasan untuk membantahnya.",
+      text: "Tedar, mau kita cocokkan jamnya?",
+    },
+    {
+      who: "Yono",
+      text: "[Arsip chat malam kejadian · 20.15; diteruskan rekannya pagi ini] “Baterai gue merah. Kalau lama nggak bales, kabarin rumah dulu, ya.”",
     },
   ],
   [
@@ -312,7 +351,7 @@ export const rewardLines: Line[][] = [
 export const opening: Line[] = [
   {
     who: "Rekan Yono",
-    text: "Dia cuma antar satu paket. Biasanya kalau telat, dia kirim voice note panjang. Kali ini cuma satu pesan.",
+    text: "Dia cuma antar satu paket. Biasanya kalau telat, voice note-nya panjang. Terakhir cuma bilang lantai delapan, lalu sepi.",
   },
   { who: "Yono", text: "“Gue udah lantai 8. Orangnya belum ada.”" },
   {
@@ -331,7 +370,7 @@ export const ending: Line[] = [
   },
   {
     who: "Detektif",
-    text: "Satu ruang yang dihapus dari denah. Satu kartu yang membantah alibi. Satu kurir yang melihat terlalu banyak.",
+    text: "Lo sempat mikir nggak bakal ada yang datang, Yon?",
   },
   {
     who: "Pak Wiwo",
@@ -347,7 +386,7 @@ export const ending: Line[] = [
   },
   {
     who: "Detektif",
-    text: "Yono ditemukan. Pengalihan kiriman terungkap. Untuk sementara, kasusnya selesai.",
+    text: "Yono ditemukan. Pengalihan kiriman terungkap. Yon, ada yang bisa jemput lo?",
   },
   {
     who: "Nomor tak dikenal",
@@ -355,6 +394,6 @@ export const ending: Line[] = [
   },
   {
     who: "Detektif",
-    text: "Siapa yang mengirim Yono ke gedung itu dengan daftar kiriman asli? Pertanyaan itu belum punya nama.",
+    text: "Siapa yang minta Yono menyimpan salinan itu?",
   },
 ];

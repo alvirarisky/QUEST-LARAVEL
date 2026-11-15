@@ -23,3 +23,6 @@ Transkrip `lift-seven.mp3`: “Lantai tujuh. Perhatikan langkah Anda.”
 ## Font dan runtime
 
 Font Oswald dan Source Sans 3 diambil dari repo referensi pengguna; berkas lisensi OFL berada di `public/fonts/`. Framework: Phaser, Vite, TypeScript. Sharp dipakai hanya untuk kompresi gambar saat persiapan aset, bukan runtime browser. Seluruh gambar/font/audio disajikan lokal, tanpa hotlink.
+
+
+Source Serif 4 Regular dibundel lokal untuk pass desain kedua, Tahap 1. Sumber resmi Adobe: https://github.com/adobe-fonts/source-serif (branch release, WOFF2/TTF/SourceSerif4-Regular.ttf.woff2). SIL Open Font License 1.1 disertakan di `public/fonts/source-serif4-OFL.md`. Tidak mengubah font atau mengambil gambar baru.

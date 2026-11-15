@@ -1,9 +1,21 @@
 import "./style.css";
 import "./cinematic.css";
+import "./moments.css";
+import "./living-world.css";
+import {
+  sceneObjects,
+  isDecoration,
+  sceneLooks,
+  narrativeTime,
+  portraitCrops,
+  speakerColors,
+  evidenceWitness,
+} from "./scene-details";
 import { icon } from "./ui";
 import {
   places,
   people,
+  witnessFlavor,
   evidence,
   ending,
   quizRewards,
@@ -55,16 +67,30 @@ let state: Save | undefined,
   lastFocus: HTMLElement | null = null,
   dialogDone: (() => void) | undefined;
 let panelRevision = 0;
+let sceneThought: { step: string; text: string } | undefined;
+let chapterFinish: (() => void) | undefined;
 let stopTyping = () => {};
+let decorThoughtTimer: ReturnType<typeof setTimeout> | undefined;
 let activeSpeaker: string | undefined;
 let toastTimer: ReturnType<typeof setTimeout>,
   busy = false,
   reduced = false;
+const motionMedia = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+let motionPreference = false;
 try {
-  reduced =
-    localStorage.getItem("dat-motion") === "reduced" ||
-    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  motionPreference = localStorage.getItem("dat-motion") === "reduced";
 } catch {}
+reduced = motionPreference || !!motionMedia?.matches;
+function syncMotionPreference() {
+  reduced = motionPreference || !!motionMedia?.matches;
+  document.documentElement.classList.toggle("reduced", reduced);
+  if (world) world.reduced = reduced;
+  const input = document.getElementById("motion") as HTMLInputElement | null;
+  if (input) {
+    input.checked = reduced;
+    input.disabled = !!motionMedia?.matches;
+  }
+}
 const $ = <T extends HTMLElement = HTMLElement>(id: string) =>
   document.getElementById(id) as T;
 const esc = (x: unknown) =>
@@ -151,9 +177,12 @@ function toast(text: string) {
   toastTimer = setTimeout(() => (t.hidden = true), 4500);
 }
 const common = `<div id="toast" role="status" aria-live="polite" hidden></div><div id="modal" class="modal" hidden><section id="dialog-card" class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1"></section></div>`;
-function modal(html: string, canClose = true, wide = false, mode = "panel") {
+function modal(html: string, canClose = true, wide = false, mode = "drawer") {
   stopTyping();
   $("modal").dataset.mode = mode;
+  document
+    .querySelector(".cinema-game")
+    ?.classList.toggle("exhibit-open", mode === "exhibit");
   document
     .querySelector(".cinema-game")
     ?.classList.toggle("in-dialogue", mode === "dialogue");
@@ -193,9 +222,15 @@ function header(kicker: string, title: string, closable = true) {
   return `<div class="modal-head"><div><p class="panel-context">${sentence}</p><h2 id="modal-title">${title}</h2></div>${closable ? `<button id="modal-close" class="icon-btn" aria-label="Tutup">${icon("close")}</button>` : ""}</div>`;
 }
 function closeModal() {
+  if (chapterFinish) {
+    chapterFinish();
+    return;
+  }
   if (!modalCanClose) return;
   stopTyping();
-  document.querySelector(".cinema-game")?.classList.remove("in-dialogue");
+  document
+    .querySelector(".cinema-game")
+    ?.classList.remove("in-dialogue", "exhibit-open");
   world?.setSpeaker?.();
   modalOpen = false;
   document.querySelector(".cinema-game")?.classList.remove("panel-open");
@@ -222,17 +257,42 @@ function portrait(who: string) {
     ? `<span class="portrait ${key}" aria-hidden="true"></span>`
     : `<span class="portrait symbolic" aria-hidden="true">${who === "Nomor tak dikenal" ? "?" : "↗"}</span>`;
 }
+function speakerKey(who: string): keyof typeof portraitCrops | "unknown" {
+  return (
+    (Object.entries(people).find(([, p]) => p.name === who)?.[0] as
+      Person | undefined) || (who === "Detektif" ? "detective" : "unknown")
+  );
+}
+function speakerPortrait(who: string) {
+  const key = speakerKey(who);
+  return key === "unknown"
+    ? `<span class="speaker-portrait unknown-portrait" aria-hidden="true">${icon("sound", 28)}</span>`
+    : `<svg class="speaker-portrait" data-portrait="${key}" viewBox="${portraitCrops[key]}" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><image href="/art/${key}-side.webp" width="1536" height="1024"/></svg>`;
+}
+function speakerStyle(who: string) {
+  return `--speaker-color:${speakerColors[speakerKey(who)]}`;
+}
+function isNarration(line: Line) {
+  return /^\[[^\]]+\]$/.test(line.text.trim());
+}
+function dialogueLogEntry(line: Line) {
+  return isNarration(line)
+    ? `<article class="log-narration"><p><em>${esc(line.text.trim().slice(1, -1))}</em></p></article>`
+    : `<article><b>${esc(line.who)}</b><p>${esc(line.text)}</p></article>`;
+}
 function dialogue(lines: Line[], after?: () => void) {
   let index = 0;
   dialogDone = after;
   const show = () => {
     const l = lines[index];
     remember(l);
-    activeSpeaker = Object.entries(people).find(
-      ([, p]) => p.name === l.who,
-    )?.[0];
+    const narration = isNarration(l);
+    const text = narration ? l.text.trim().slice(1, -1) : l.text;
+    activeSpeaker = narration
+      ? undefined
+      : Object.entries(people).find(([, p]) => p.name === l.who)?.[0];
     modal(
-      `<div class="vn-top"><span id="modal-title" class="speaker-tab">${esc(l.who)}</span><button id="dialog-log" class="text-btn">Log</button></div><p class="vn-text"><span id="dialog-typed" aria-hidden="true"></span><span class="sr-only">${esc(l.text)}</span></p><div class="vn-bottom"><span class="vn-key">Klik / Spasi buat lanjut</span><button id="dialog-next" class="text-btn">Lanjut ${icon("arrow", 18)}</button></div>`,
+      `<div class="vn-shell ${narration ? "is-narration" : ""}" data-speaker="${narration ? "narrator" : speakerKey(l.who)}" style="${speakerStyle(l.who)}">${narration ? "" : speakerPortrait(l.who)}<div class="vn-content"><div class="vn-top">${narration ? '<span id="modal-title" class="sr-only">Narasi</span>' : `<span id="modal-title" class="speaker-tab">${esc(l.who)}</span>`}<button id="dialog-log" class="text-btn">Log</button></div><p class="vn-text ${narration ? "is-narration" : ""}" tabindex="0" role="region" aria-label="Teks percakapan"><span id="dialog-typed" aria-hidden="true"></span><span class="sr-only">${esc(text)}</span></p><div class="vn-bottom"><span class="vn-key">Klik / Spasi buat lanjut</span><button id="dialog-next" class="text-btn">Lanjut ${icon("arrow", 18)}</button></div></div></div>`,
       false,
       false,
       "dialogue",
@@ -244,7 +304,7 @@ function dialogue(lines: Line[], after?: () => void) {
     const finish = () => {
       stopTyping();
       complete = true;
-      el.textContent = l.text;
+      el.textContent = text;
     };
     if (reduced) finish();
     else {
@@ -253,8 +313,8 @@ function dialogue(lines: Line[], after?: () => void) {
           clearInterval(timer);
           return;
         }
-        el.textContent = l.text.slice(0, ++n);
-        if (n >= l.text.length) {
+        el.textContent = text.slice(0, ++n);
+        if (n >= text.length) {
           clearInterval(timer);
           complete = true;
         }
@@ -290,7 +350,7 @@ function dialogue(lines: Line[], after?: () => void) {
 }
 function dialogueLog(back: () => void) {
   modal(
-    `${header("Percakapan", "Yang sudah terucap", false)}<div class="log-list">${state!.log.map((l) => `<article><b>${esc(l.who)}</b><p>${esc(l.text)}</p></article>`).join("")}</div><button id="log-back" class="primary">Kembali ke percakapan</button>`,
+    `${header("Percakapan", "Yang sudah terucap", false)}<div class="log-list">${state!.log.map(dialogueLogEntry).join("")}</div><button id="log-back" class="primary">Kembali ke percakapan</button>`,
     false,
   );
   bind("log-back", back);
@@ -463,7 +523,7 @@ async function resumeRun(saved: Save) {
   }
 }
 async function mountGame() {
-  app.innerHTML = `<main class="cinema-game"><div class="scene-stage"><div id="world"></div><div class="scene-scrim"></div><div id="loading" class="loading"><span class="loading-mark">D / 7</span><p>Ngebuka tempat kejadian…</p></div></div><header class="cinema-header"><button class="wordmark" id="brand-game" aria-label="Jeda permainan">D<span>/</span>7</button><button class="place-heading" id="places-btn" aria-label="Pindah lokasi"><span id="location-heading"></span>${icon("location", 16)}</button><nav class="scene-tools" aria-label="Peralatan penyelidikan"><button id="objects-btn" aria-label="Daftar objek" title="Daftar objek">${icon("objects")}</button><button id="journal-btn" aria-label="Catatan" title="Catatan">${icon("notes")}</button><button id="hint-btn" aria-label="Petunjuk" title="Petunjuk">${icon("hint")}</button><button id="settings-btn" aria-label="Jeda" title="Jeda">${icon("pause")}</button><span class="player-avatar" id="player-name" title="Penyelidik">${portrait("Detektif")}</span></nav></header><p id="objective" class="scene-objective" role="status"></p><button id="evidence-btn" class="case-map-button" aria-label="Papan bukti">${icon("map")}<span id="evidence-count"></span></button><div id="floor-panel"></div></main>${common}`;
+  app.innerHTML = `<main class="cinema-game"><div class="scene-stage"><div id="world"></div><div class="world-tint" aria-hidden="true"></div><div class="world-atmosphere" aria-hidden="true"><i class="atmosphere-dust"></i><i class="atmosphere-rain"></i><i class="light-haze"></i><i class="world-vignette"></i></div><div class="scene-scrim"></div><div id="loading" class="loading"><span class="loading-mark">D / 7</span><p>Ngebuka tempat kejadian…</p></div></div><header class="cinema-header"><button class="wordmark" id="brand-game" aria-label="Jeda permainan">D<span>/</span>7</button><span class="narrative-clock" id="narrative-clock" title="Waktu cerita fiksi, bukan batas waktu" aria-label="Jam cerita fiksi"></span><button class="place-heading" id="places-btn" aria-label="Pindah lokasi"><span id="location-heading"></span>${icon("location", 16)}</button><nav class="scene-tools" aria-label="Peralatan penyelidikan"><button id="objects-btn" aria-label="Daftar objek" title="Daftar objek">${icon("objects")}</button><button id="journal-btn" aria-label="Catatan" title="Catatan">${icon("notes")}</button><button id="hint-btn" aria-label="Petunjuk" title="Petunjuk">${icon("hint")}</button><button id="settings-btn" aria-label="Jeda" title="Jeda">${icon("pause")}</button><span class="player-avatar" id="player-name" title="Penyelidik">${portrait("Detektif")}</span></nav></header><p id="objective" class="scene-objective" role="status"></p><button id="evidence-btn" class="case-map-button" aria-label="Papan bukti">${icon("map")}<span id="evidence-count"></span></button><div id="floor-panel"></div></main>${common}`;
   bind("journal-btn", journal);
   bind("hint-btn", hints);
   bind("settings-btn", settings);
@@ -504,12 +564,21 @@ async function mountGame() {
 }
 function objectList() {
   modal(
-    `${header("Di ruangan ini", "Periksa sekitar")}<div class="object-list">${places[state!.location].hotspots.map((h) => `<button data-hotspot="${h.id}">${icon(h.person ? "notes" : "eye", 18)}<span>${esc(h.label)}</span>${icon("arrow", 18)}</button>`).join("")}</div><label class="toggle"><input id="highlight-btn" type="checkbox"> Tampilkan nama objek</label>`,
+    `${header("Di ruangan ini", "Periksa sekitar")}<div class="object-list">${sceneObjects(
+      state!.location,
+    )
+      .map(
+        (h) =>
+          `<button data-hotspot="${h.id}" data-object-kind="${isDecoration(h) ? "decor" : h.person ? "person" : "evidence"}">${icon(h.person ? "notes" : "eye", 18)}<span>${esc(h.label)}${isDecoration(h) ? "<small>Suasana ruangan</small>" : ""}</span>${icon("arrow", 18)}</button>`,
+      )
+      .join(
+        "",
+      )}</div><label class="toggle"><input id="highlight-btn" type="checkbox"> Tampilkan nama objek</label>`,
   );
   document.querySelectorAll<HTMLButtonElement>("[data-hotspot]").forEach(
     (b) =>
       (b.onclick = () => {
-        const h = places[state!.location].hotspots.find(
+        const h = sceneObjects(state!.location).find(
           (h) => h.id === b.dataset.hotspot,
         )!;
         closeModal();
@@ -543,7 +612,7 @@ function locationList() {
       )
       .join("")}</nav>`,
   );
-  document.querySelectorAll<HTMLButtonElement>("[data-place]").forEach(
+  document.querySelectorAll<HTMLButtonElement>("button[data-place]").forEach(
     (b) =>
       (b.onclick = () => {
         closeModal();
@@ -583,27 +652,72 @@ function goNext() {
   const h = places[step.place].hotspots.find((h) => h.id === step.hotspot);
   if (h) world?.inspect(h);
 }
-function progressSummary(title: string, detail: string) {
+const detectiveThoughts: Record<string, string> = {
+  "meet-allie": "Gue mulai dari orang yang melihat Yono datang.",
+  ledger: "Buku tamu: siapa yang nunggu Yono?",
+  plan: "Lantai delapan—tapi denahnya bilang apa?",
+  cctv: "Sekarang gue butuh mata yang nggak mengandalkan ingatan.",
+  "allie-proof": "Allie, ada sebelas menit yang belum lo ceritain.",
+  "meet-noah": "Akses servis? Gue perlu cari Noah di area lift.",
+  report: "Noah sudah memperingatkan siapa?",
+  photo: "Yon, apa yang lo lihat di sana?",
+  "noah-proof": "Noah, apa yang ditutup di denah ini?",
+  "meet-wiwo": "Sekarang gue perlu ke kantor Wiwo dan lihat paketnya.",
+  parcel: "Siapa yang mau paket ini sampai tanpa kurirnya?",
+  "meet-tedar": "Tedar ngurus kiriman ini; kapan tepatnya dia pulang?",
+  access: "Kalau alibinya benar, catatan kartu bakal cocok.",
+  "tedar-proof": "Tedar, jam delapan yang mana?",
+  "archive-door": "Gue perlu ke area servis; Noah bisa bantu membuka arsip.",
+  "find-yono": "Yon? Kalau lo dengar gue, jawab.",
+  manifest: "Apa daftar aslinya masih di sini?",
+  conclusion: "Orang, jalur, motif—apa semuanya sudah nyambung?",
+};
+function think(text?: string) {
+  if (!state) return;
+  const step = nextStep(state);
+  sceneThought = {
+    step: step.id,
+    text: text || detectiveThoughts[step.id] || step.title,
+  };
   renderHUD();
-  const step = nextStep(state!);
-  modal(
-    `${header("Jejaknya nyambung", esc(title), false)}<p class="discovery-meaning">${esc(detail)}</p><div class="next-lead"><p class="eyebrow">Berikutnya · ${esc(places[step.place].name)}</p><h3>${esc(step.title)}</h3><p>${esc(step.detail)}</p></div><div class="actions"><button id="follow-lead" class="primary">${esc(leadLabel(step))} ${icon("arrow", 18)}</button><button id="stay-scene" class="secondary">Balik ke ruangan</button></div>`,
-    false,
-  );
-  bind("follow-lead", goNext);
-  bind("stay-scene", () => {
+}
+function progressSummary(_title: string, _detail: string) {
+  // A finished conversation returns control to the room, without another gate.
+  if (modalOpen) {
     modalCanClose = true;
     closeModal();
-  });
+  }
+  think();
 }
 function renderHUD() {
   if (!state || !$("objective")) return;
   const step = nextStep(state);
+  const thought =
+    sceneThought?.step === step.id ? sceneThought.text : undefined;
   $("objective").textContent =
-    state.location === step.place
+    thought ||
+    (state.location === step.place
       ? step.title
-      : `${step.title} ${places[step.place].name}.`;
+      : `${step.title} ${places[step.place].name}.`);
+  $("objective").classList.toggle("detective-thought", !!thought);
   $("location-heading").textContent = places[state.location].name;
+  if ($("narrative-clock")) {
+    $("narrative-clock").textContent = narrativeTime(availablePlaces(state));
+    $("narrative-clock").setAttribute(
+      "aria-label",
+      `Waktu cerita fiksi ${narrativeTime(availablePlaces(state))}, bukan batas waktu`,
+    );
+  }
+  const root = document.querySelector(".cinema-game") as HTMLElement | null;
+  if (root) {
+    root.dataset.scene = state.location;
+    root.style.setProperty(
+      "--world-tint",
+      "#" + sceneLooks[state.location].tint.toString(16).padStart(6, "0"),
+    );
+    root.dataset.weather = sceneLooks[state.location].weather;
+  }
+
   $("evidence-count").textContent = String(state.clues.length);
   $("floor-panel").innerHTML =
     `<button id="floor-toggle" aria-label="Panel lift, progres Laravel">${icon("lift")}</button><div class="floor-buttons" aria-label="Progres analisis Laravel">${floorsMarkup()}</div>`;
@@ -614,18 +728,46 @@ function renderHUD() {
   world?.setProgress(done());
   world?.setFocus(state.location === step.place ? step.hotspot : undefined);
 }
+function chapterCard(id: Place, arrive: () => void) {
+  const [number, ...rest] = places[id].chapter.split("•");
+  modal(
+    `<button id="chapter-skip" class="chapter-card" aria-label="Lewati kartu bab, masuk ${esc(places[id].name)}"><span>Bab ${esc(number.trim())}</span><h2 id="modal-title">${esc(rest.join("•").trim())}</h2><p>${esc(places[id].name)}</p><small>Klik atau Esc buat lanjut</small></button>`,
+    true,
+    false,
+    "chapter",
+  );
+  const finish = () => {
+    clearTimeout(timer);
+    chapterFinish = undefined;
+    closeModal();
+    arrive();
+  };
+  const timer = setTimeout(finish, 1200);
+  chapterFinish = finish;
+  bind("chapter-skip", finish);
+}
 function travel(id: Place) {
   if (!unlocked(id) || modalOpen || !worldReady || id === state!.location)
     return;
-  state!.location = id;
-  checkpoint();
-  world?.loadPlace(id);
-  audio.setRoom(id);
-  audio.sfx(id === "lift" ? "lift" : "door");
-  if (id === "lift") audio.speak("lift-seven");
-  renderHUD();
+  chapterCard(id, () => {
+    state!.location = id;
+    checkpoint();
+    world?.loadPlace(id);
+    audio.setRoom(id);
+    audio.sfx(id === "lift" ? "lift" : "door");
+    if (id === "lift") audio.speak("lift-seven");
+    renderHUD();
+  });
 }
 function inspect(h: Hotspot) {
+  if (isDecoration(h)) {
+    think(h.thought);
+    clearTimeout(decorThoughtTimer);
+    decorThoughtTimer = setTimeout(() => {
+      if (sceneThought?.text === h.thought) think();
+    }, 5000);
+    return;
+  }
   audio.sfx("click");
   if (h.person) {
     openPerson(h.person);
@@ -642,20 +784,13 @@ function inspect(h: Hotspot) {
       step.hotspot !== h.id ||
       step.place !== state!.location
     ) {
-      modal(
-        `${header("URUTAN PENYELIDIKAN", "Ada jejak yang perlu lo cek dulu.")}<p>${esc(step.detail)}</p><button id="required-step" class="primary">${esc(leadLabel(step))} ${icon("arrow", 18)}</button>`,
-      );
-      bind("required-step", goNext);
+      think(detectiveThoughts[step.id] || step.detail);
       return;
     }
     const n = h.quiz,
       note = challengeNotes[n];
-    modal(
-      `${header("Periksa bukti", esc(h.label))}<div class="inspection-notes"><section><p class="eyebrow">Yang lo lihat</p><p>${esc(note.look)}</p></section><section><p class="eyebrow">Kenapa penting?</p><p>${esc(note.meaning)}</p></section></div><div class="learning-bridge"><span>Analisis Laravel</span><h3>${esc(note.concept)}</h3><p>${esc(note.why)}</p></div><button id="begin-analysis" class="primary">Mulai analisis ${icon("arrow", 18)}</button>`,
-      true,
-      true,
-    );
-    bind("begin-analysis", () => void openQuiz());
+    think(note.meaning);
+    showExhibit(quizRewards[n], note.look, () => void openQuiz(), n);
     return;
   }
   if (h.id === "stairs") {
@@ -698,16 +833,53 @@ function bindClues(returnTo?: () => void) {
     .querySelectorAll<HTMLButtonElement>("[data-clue]")
     .forEach((b) => (b.onclick = () => clue(b.dataset.clue!, returnTo)));
 }
-function clue(id: string, after?: () => void) {
+function exhibitMarkup(id: string, text: string, analysisIndex?: number) {
   const e = evidence[id];
+  const kind = ["message", "photo", "cctv", "access"].includes(id)
+    ? "screen"
+    : id === "parcel"
+      ? "parcel"
+      : id === "key"
+        ? "key"
+        : "paper";
+  const important =
+    e.quote ||
+    (analysisIndex !== undefined
+      ? challengeNotes[analysisIndex].look
+      : text.split(". ")[0] + (text.includes(". ") ? "." : ""));
+  const rest =
+    important === text || important === e.quote
+      ? text
+      : text.slice(important.length).trim();
+  const witness = evidenceWitness[id];
+  return `<div class="exhibit-toolbar"><p>${esc(e.tag.toLocaleLowerCase("id-ID"))}</p><button id="modal-close" class="icon-btn" aria-label="Tutup bukti">${icon("close")}</button></div><div class="exhibit-stage"><aside class="exhibit-witness" style="${speakerStyle(people[witness].name)}">${speakerPortrait(people[witness].name)}<div><small>Konteks saksi</small><b>${esc(people[witness].name)}</b><span>${esc(people[witness].role)}</span></div></aside><article class="physical-exhibit exhibit-${kind}" data-evidence="${id}"><div class="exhibit-object-mark" aria-hidden="true"><span class="prop" style="--col:${e.frame % 4};--row:${Math.floor(e.frame / 4)}"></span></div><h2 id="modal-title">${esc(e.title)}</h2><blockquote>${esc(important)}</blockquote>${rest && rest !== important ? `<p class="exhibit-description">${esc(rest)}</p>` : ""}${analysisIndex !== undefined ? `<div class="exhibit-analysis"><span>${esc(challengeNotes[analysisIndex].concept)}</span><button id="begin-analysis" class="primary">Mulai analisis ${icon("arrow", 18)}</button></div>` : ""}</article></div>`;
+}
+function showExhibit(
+  id: string,
+  text: string,
+  analyze?: () => void,
+  analysisIndex?: number,
+) {
+  modal(exhibitMarkup(id, text, analysisIndex), true, true, "exhibit");
+  if (analyze) bind("begin-analysis", analyze);
+}
+function clue(id: string, after?: () => void) {
   audio.sfx("paper");
-  modal(
-    `${header(esc(e.tag), esc(e.title))}<div class="evidence-detail"><span class="prop prop-large" style="--col:${e.frame % 4};--row:${Math.floor(e.frame / 4)}"></span><div>${e.quote ? `<blockquote>${esc(e.quote)}</blockquote>` : ""}<p class="${["access", "report", "ledger", "manifest"].includes(id) ? "printed-log" : ""}">${esc(e.description)}</p></div></div><button id="clue-close" class="primary">${after === evidenceList ? "Kembali ke papan bukti" : after === journal ? "Kembali ke catatan" : after ? "Lanjutkan pemeriksaan" : "Tutup bukti"} ${icon("arrow", 18)}</button>`,
-  );
-  bind("clue-close", () => {
+  showExhibit(id, evidence[id].description);
+  const button = document.createElement("button");
+  button.id = "clue-close";
+  button.className = "exhibit-return text-btn";
+  button.textContent =
+    after === evidenceList
+      ? "Balik ke papan bukti"
+      : after === journal
+        ? "Balik ke catatan"
+        : "Balik ke ruangan";
+  $("dialog-card").append(button);
+  button.onclick = () => {
     closeModal();
     after?.();
-  });
+  };
 }
 const evidenceLinks = [
   ["message", "photo"],
@@ -745,7 +917,7 @@ function evidenceList() {
 function journal() {
   const step = nextStep(state!);
   modal(
-    `${header("Catatan", "Kasus Yono")}<section class="notebook-objective"><h3>${esc(step.title)}</h3><p>${esc(step.detail)}</p><p class="muted">${esc(places[step.place].name)}</p></section><h3>Yang sudah ketahuan</h3><div class="notebook-clues">${state!.clues.map((id) => `<button data-clue="${id}"><b>${esc(evidence[id].title)}</b><span>${esc(evidence[id].description)}</span></button>`).join("")}</div><details class="notebook-log"><summary>Log percakapan</summary><div class="log-list">${state!.log.map((l) => `<article><b>${esc(l.who)}</b><p>${esc(l.text)}</p></article>`).join("") || "<p>Belum ada percakapan.</p>"}</div></details>${state!.reviews.length ? '<button id="review-btn" class="secondary">Ulas analisis Laravel</button>' : ""}`,
+    `${header("Catatan", "Kasus Yono")}<section class="notebook-objective"><h3>${esc(step.title)}</h3><p>${esc(step.detail)}</p><p class="muted">${esc(places[step.place].name)}</p></section><h3>Yang sudah ketahuan</h3><div class="notebook-clues">${state!.clues.map((id) => `<button data-clue="${id}"><b>${esc(evidence[id].title)}</b><span>${esc(evidence[id].description)}</span></button>`).join("")}</div><details class="notebook-log"><summary>Log percakapan</summary><div class="log-list">${state!.log.map(dialogueLogEntry).join("") || "<p>Belum ada percakapan.</p>"}</div></details>${state!.reviews.length ? '<button id="review-btn" class="secondary">Ulas analisis Laravel</button>' : ""}`,
     true,
     false,
     "drawer",
@@ -838,40 +1010,49 @@ function openPerson(id: Person) {
     const follow: Record<string, string> = {
       allie:
         "Yono menulis buku tamu sebelum naik. Coba periksa buku di meja gue; tujuan dan instruksi penerimanya ada di situ.",
-      noah: "Laporan gue tersimpan di panel pemeriksaan. Lihat dulu sebelum kita menyimpulkan lift bermasalah.",
-      wiwo: "Gue minta audit karena ada kiriman yang tercatat diterima, tapi tidak sampai ke kantor. Paket YN07 di samping meja membawa salinan daftarnya.",
+      noah: "Laporan gue ada di panel. Gue minta akses dimatikan sebelum kejadian, tapi belum disetujui.",
+      wiwo: "Gue minta audit karena ada kiriman tercatat diterima, tapi nggak masuk kantor. Paket YN07 membawa salinannya.",
       tedar:
         "Kalau lo mau memeriksa waktu pulang gue, terminal akses ada di meja. Tapi gue yakin tidak ada yang aneh.",
     };
-    dialogue([{ who: people[id].name, text: people[id].intro }], () => {
-      const question: Record<string, string> = {
-        allie: "Yono diarahkan ke mana?",
-        noah: "Ada catatan kondisi lift?",
-        wiwo: "Kenapa lo minta audit?",
-        tedar: "Ada catatan waktu pulang lo?",
-      };
-      const ask = () =>
-        dialogue([{ who: people[id].name, text: follow[id] }], () => {
-          state!.flags[key] = true;
-          state!.flags["seen-" + id] = true;
-          checkpoint();
-          progressSummary(
-            "Keterangan " + people[id].name + " dicatat.",
-            follow[id],
-          );
-        });
-      modal(
-        `<div class="vn-top"><span id="modal-title" class="speaker-tab">Tanya ${people[id].name}</span></div><div class="vn-choices"><button id="witness-question">${esc(question[id])} ${icon("arrow", 18)}</button><button id="witness-repeat">Ulangi keterangan lo tadi.</button></div>`,
-        false,
-        false,
-        "dialogue",
-      );
-      world?.setSpeaker?.(id);
-      bind("witness-question", ask);
-      bind("witness-repeat", () =>
-        dialogue([{ who: people[id].name, text: people[id].intro }], ask),
-      );
-    });
+    dialogue(
+      [
+        {
+          who: people[id].name,
+          text: people[id].intro,
+        },
+        ...witnessFlavor[id].map((text) => ({ who: people[id].name, text })),
+      ],
+      () => {
+        const question: Record<string, string> = {
+          allie: "Yono diarahkan ke mana?",
+          noah: "Ada catatan kondisi lift?",
+          wiwo: "Kenapa lo minta audit?",
+          tedar: "Ada catatan waktu pulang lo?",
+        };
+        const ask = () =>
+          dialogue([{ who: people[id].name, text: follow[id] }], () => {
+            state!.flags[key] = true;
+            state!.flags["seen-" + id] = true;
+            checkpoint();
+            progressSummary(
+              "Keterangan " + people[id].name + " dicatat.",
+              follow[id],
+            );
+          });
+        modal(
+          `<div class="vn-shell" data-speaker="${id}" style="${speakerStyle(people[id].name)}">${speakerPortrait(people[id].name)}<div class="vn-content"><div class="vn-top"><span id="modal-title" class="speaker-tab">Tanya ${people[id].name}</span></div><div class="vn-choices"><button id="witness-question">${esc(question[id])} ${icon("arrow", 18)}</button><button id="witness-repeat">Ulangi keterangan lo tadi.</button></div></div></div>`,
+          false,
+          false,
+          "dialogue",
+        );
+        world?.setSpeaker?.(id);
+        bind("witness-question", ask);
+        bind("witness-repeat", () =>
+          dialogue([{ who: people[id].name, text: people[id].intro }], ask),
+        );
+      },
+    );
     return;
   }
   personMenu(id);
@@ -933,7 +1114,7 @@ function chooseProof(id: Person, feedback = "") {
   const t = testimony[id],
     available = t.candidates.filter(has);
   modal(
-    `${header("BANDINGKAN KETERANGAN", esc(people[id].name))}<blockquote class="witness-quote">“${esc(t.statement)}”</blockquote><p class="proof-question">${esc(t.question)}</p>${feedback ? `<p class="proof-feedback" role="status">${esc(feedback)}</p>` : ""}<div class="proof-options proof-options-detailed">${available.map((c) => `<button data-show="${c}"><span class="prop" style="--col:${evidence[c].frame % 4};--row:${Math.floor(evidence[c].frame / 4)}"></span><span><b>${esc(evidence[c].title)}</b><small>${esc(evidence[c].description)}</small></span><span>${icon("arrow", 18)}</span></button>`).join("")}</div>${available.length ? "" : "<p>Belum ada bukti terkait yang dicatat. Periksa petunjuk aktif lebih dulu.</p>"}<div class="actions"><button id="back-person" class="secondary">Balik ke saksi</button><button id="proof-next" class="text-btn">Lihat langkah penyelidikan ${icon("arrow", 18)}</button></div>`,
+    `${header("BANDINGKAN KETERANGAN", esc(people[id].name))}<div class="testimony-person" style="${speakerStyle(people[id].name)}">${speakerPortrait(people[id].name)}<div><p>${esc(people[id].role)}</p><blockquote class="witness-quote">“${esc(t.statement)}”</blockquote></div></div><p class="proof-question">${esc(t.question)}</p>${feedback ? `<p class="proof-feedback" role="status">${esc(feedback)}</p>` : ""}<div class="proof-options proof-options-detailed">${available.map((c) => `<button data-show="${c}"><span class="prop" style="--col:${evidence[c].frame % 4};--row:${Math.floor(evidence[c].frame / 4)}"></span><span><b>${esc(evidence[c].title)}</b><small>${esc(evidence[c].description)}</small></span><span>${icon("arrow", 18)}</span></button>`).join("")}</div>${available.length ? "" : "<p>Belum ada bukti terkait yang dicatat. Periksa petunjuk aktif lebih dulu.</p>"}<div class="actions"><button id="back-person" class="secondary">Balik ke saksi</button><button id="proof-next" class="text-btn">Lihat langkah penyelidikan ${icon("arrow", 18)}</button></div>`,
     true,
     true,
   );
@@ -955,25 +1136,24 @@ function showProof(id: Person, c: string) {
       flag: "allieTruth",
       title: "Allie mengoreksi keterangannya.",
       reply:
-        "Oke. Gue ke belakang dari 20.13 sampai 20.24. Sebelum pergi gue dengar Yono ditelepon Tedar dan disuruh langsung naik. Gue tidak melihat dia masuk lift.",
+        "Oke. Gue ke belakang dari 20.13 sampai 20.24. Anak gue demam di rumah; gue nenangin dia lewat telepon. Gue takut ngaku ninggalin pos. Sebelum pergi, gue dengar Yono ditelepon Tedar dan disuruh langsung naik. Gue nggak melihat dia masuk lift.",
       meaning:
-        "Rekaman membantah klaim Allie berjaga. Dia menyembunyikan meninggalkan pos, tetapi menyebut Tedar sebagai pemberi arahan.",
+        "Allie menyembunyikan telepon keluarganya; arahan kepada Yono datang dari Tedar.",
     },
     noah: {
       flag: "noahTruth",
       title: "Denah ternyata tidak lengkap.",
       reply:
         "Di bagian yang ditutup itu ada arsip atap. Penomoran servis lamanya 8. Aksesnya memakai kartu eksekutif. Jadi bukan lantai gaib—ruangan itu sengaja tidak dicantumkan untuk pengunjung.",
-      meaning:
-        "Pesan Yono masuk akal: dia mencapai arsip lewat akses servis. Selidiki siapa yang punya akses dan kenapa paket sudah di kantor.",
+      meaning: "Kunci bukan tuduhan. Siapa yang memakai aksesnya?",
     },
     tedar: {
       flag: "tedarTruth",
       title: "Waktu pada log membantah alibi.",
       reply:
-        "Kartu TD-02 memang punya gue. Gue… kembali mengambil berkas. Tapi penggunaan kartu saja belum menjelaskan semua yang terjadi di arsip.",
+        "Kartu TD-02 memang punya gue. Gue… kembali mengambil berkas. Gue nyebut teknisi buat ngulur pertanyaan lo, bukan karena gue lihat Noah memakai kartu itu. Tapi penggunaan kartu saja belum menjelaskan semua yang terjadi di arsip.",
       meaning:
-        "Tedar mengaku pulang pukul 20.00, tetapi kartunya membuka arsip 20.18 dan kantor 20.31. Noah kini bisa membantu membuka akses untuk mencari Yono.",
+        "Tedar mengalihkan pertanyaan ke teknisi. Noah bisa bantu membuka jalurnya; Yono yang perlu kita cari.",
     },
     wiwo: {
       flag: "wiwoProof",
@@ -1009,6 +1189,7 @@ function showProof(id: Person, c: string) {
     `${header("Buktinya nyambung", response.title, false)}<div class="contradiction"><section><p class="eyebrow">Ucapan saksi</p><blockquote>“${esc(testimony[id].statement)}”</blockquote></section><section><p class="eyebrow">Bukti · ${esc(evidence[c].title)}</p><p>${esc(evidence[c].description)}</p></section></div><p class="witness-reply"><b>${esc(people[id].name)}:</b> “${esc(response.reply)}”</p><p class="discovery-meaning">${esc(response.meaning)}</p><div class="actions"><button id="proof-continue" class="primary">${esc(leadLabel(next))} ${icon("arrow", 18)}</button><button id="proof-stay" class="secondary">Balik ke ruangan</button></div>`,
     false,
     true,
+    "reveal",
   );
   bind("proof-continue", goNext);
   bind("proof-stay", () => {
@@ -1180,17 +1361,30 @@ function expectedText(f: Feedback) {
 function showFeedback(f: Feedback) {
   const clueId = quizRewards[f.question.number - 1],
     ev = evidence[clueId];
+  const archive = rewardLines[f.question.number - 1].filter(
+    (l) => l.who === "Yono",
+  );
+  archive.forEach(remember);
+  if (archive.length) {
+    audio.sfx("phone");
+    toast("Rekan Yono meneruskan arsip chat malam kejadian.");
+  }
   const meaning = rewardLines[f.question.number - 1]
+    .filter((l) => l.who !== "Yono")
     .map((l) => l.text)
     .join(" ");
   const step = nextStep(state!);
   modal(
-    `${header(`ANALISIS LARAVEL ${f.question.number} / 8 · SELESAI`, f.correct ? "Analisis lo nyambung." : "Cek lagi sambungannya.", false)}<p class="analysis-reaction">Detektif: “${f.correct ? "Sambungannya pas. Sekarang kita baca buktinya." : "Gue perlu benerin sambungan ini. Petunjuknya tetap bisa kita periksa."}”</p><span class="score-pill ${f.correct ? "good" : ""}">${f.correct ? "+12,5 poin" : "Skor +0 · kasus tetap lanjut"}</span><details class="feedback-learning" ${f.correct ? "" : "open"}><summary>${f.correct ? "Ulas konsep Laravel" : "Kenapa jawabanmu belum tepat?"}</summary><p>${esc(f.explanation)}</p><pre>${esc(expectedText(f))}</pre></details><section class="discovered-proof"><p class="eyebrow">Bukti baru · ${esc(ev.title)}</p><p>${esc(ev.description)}</p><strong>${esc(meaning)}</strong></section><div class="next-lead"><p class="eyebrow">Berikutnya · ${esc(places[step.place].name)}</p><p>${esc(step.detail)}</p></div><div class="actions"><button id="feedback-next" class="primary">${esc(leadLabel(step))} ${icon("arrow", 18)}</button><button id="stay-scene" class="secondary">Balik ke ruangan</button></div>`,
+    `${header(`ANALISIS LARAVEL ${f.question.number} / 8 · SELESAI`, f.correct ? "Analisis lo nyambung." : "Cek lagi sambungannya.", false)}<p class="analysis-reaction">Detektif: “${f.correct ? "Sambungannya pas. Sekarang kita baca buktinya." : "Gue perlu benerin sambungan ini. Petunjuknya tetap bisa kita periksa."}”</p><span class="score-pill ${f.correct ? "good" : ""}">${f.correct ? "+12,5 poin" : "Skor +0 · kasus tetap lanjut"}</span><details class="feedback-learning" ${f.correct ? "" : "open"}><summary>${f.correct ? "Ulas konsep Laravel" : "Kenapa jawabanmu belum tepat?"}</summary><p>${esc(f.explanation)}</p><pre>${esc(expectedText(f))}</pre></details><section class="discovered-proof"><p class="eyebrow">Bukti baru · ${esc(ev.title)}</p><p>${esc(ev.description)}</p><strong>${esc(meaning)}</strong></section><div class="next-lead"><p class="eyebrow">Berikutnya · ${esc(places[step.place].name)}</p><p>${esc(step.detail)}</p></div><div class="actions"><button id="feedback-next" class="primary">Balik ke kasus ${icon("arrow", 18)}</button><button id="stay-scene" class="secondary">Balik ke ruangan</button></div>`,
     false,
     true,
     "analysis",
   );
-  bind("feedback-next", goNext);
+  bind("feedback-next", () => {
+    modalCanClose = true;
+    closeModal();
+    think();
+  });
   bind("stay-scene", () => {
     modalCanClose = true;
     closeModal();
@@ -1270,7 +1464,7 @@ function conclusion() {
 }
 function settings() {
   modal(
-    `${header("JEDA / PENGATURAN", "Jeda dulu.")}<div class="audio-settings">${(["master", "music", "ambience", "effects", "voice"] as const).map((k, i) => `<label><span>${["Volume utama", "Musik noir", "Suasana ruangan", "Efek suara", "Pesan suara"][i]}</span><input type="range" id="volume-${k}" min="0" max="100" value="${Math.round(audio.levels[k] * 100)}" aria-label="${["Volume utama", "Musik", "Ambience", "Efek", "Suara dialog"][i]}"><output id="value-${k}">${Math.round(audio.levels[k] * 100)}%</output></label>`).join("")}</div><label class="toggle"><input id="spoken" type="checkbox" ${audio.levels.spoken ? "checked" : ""}> Aktifkan pesan suara Yono dan pengumuman lift</label><p class="muted">Dialog lain berupa teks. Tanpa suara pun, semua petunjuk kebaca.</p><label class="toggle"><input id="motion" type="checkbox" ${reduced ? "checked" : ""}> Kurangi animasi</label><div class="actions"><button id="test-audio" class="secondary">Tes suara</button>${state ? '<button id="replay-scene" class="secondary">Lihat ulang ruangan</button><button id="return-menu" class="secondary">Simpan dan keluar</button>' : ""}<button id="continue-game" class="primary">Lanjut main</button></div>`,
+    `${header("JEDA / PENGATURAN", "Jeda dulu.")}<div class="audio-settings">${(["master", "music", "ambience", "effects", "voice"] as const).map((k, i) => `<label><span>${["Volume utama", "Musik noir", "Suasana ruangan", "Efek suara", "Pesan suara"][i]}</span><input type="range" id="volume-${k}" min="0" max="100" value="${Math.round(audio.levels[k] * 100)}" aria-label="${["Volume utama", "Musik", "Ambience", "Efek", "Suara dialog"][i]}"><output id="value-${k}">${Math.round(audio.levels[k] * 100)}%</output></label>`).join("")}</div><label class="toggle"><input id="spoken" type="checkbox" ${audio.levels.spoken ? "checked" : ""}> Aktifkan pesan suara Yono dan pengumuman lift</label><p class="muted">Dialog lain berupa teks. Tanpa suara pun, semua petunjuk kebaca.</p><label class="toggle"><input id="motion" type="checkbox" ${reduced ? "checked" : ""} ${motionMedia?.matches ? "disabled" : ""}> Kurangi animasi</label><div class="actions"><button id="test-audio" class="secondary">Tes suara</button>${state ? '<button id="replay-scene" class="secondary">Lihat ulang ruangan</button><button id="return-menu" class="secondary">Simpan dan keluar</button>' : ""}<button id="continue-game" class="primary">Lanjut main</button></div>`,
     true,
     false,
     "drawer",
@@ -1289,12 +1483,11 @@ function settings() {
   $<HTMLInputElement>("spoken").onchange = (e) =>
     audio.setLevel("spoken", (e.target as HTMLInputElement).checked);
   $<HTMLInputElement>("motion").onchange = (e) => {
-    reduced = (e.target as HTMLInputElement).checked;
+    motionPreference = (e.target as HTMLInputElement).checked;
     try {
-      localStorage.setItem("dat-motion", reduced ? "reduced" : "full");
+      localStorage.setItem("dat-motion", motionPreference ? "reduced" : "full");
     } catch {}
-    if (world) world.reduced = reduced;
-    document.documentElement.classList.toggle("reduced", reduced);
+    syncMotionPreference();
   };
   bind("test-audio", () => {
     void audio.unlock().then(() => audio.sfx("lift"));
@@ -1310,6 +1503,8 @@ async function results() {
   modal(
     `${header("Kasus selesai", "Yono ditemukan.", false)}<p>Menyiapkan hasil tantangan Laravel…</p>`,
     false,
+    false,
+    "result",
   );
   try {
     if (!state!.receipt) {
@@ -1323,6 +1518,7 @@ async function results() {
       `${header("Kasus ditutup", "Di atas tujuh.", false)}<div class="results-grid"><div><p class="result-score">${String(r.score).replace(".", ",")}<span>/100</span></p><p>${r.correct} dari 8 jawaban pertama tepat.</p><p class="muted">${esc(r.identity.name)} · ${esc(r.identity.student)} · ${esc(r.identity.kelas)}</p></div><div class="case-outcome"><span class="eyebrow accent">HASIL PENYELIDIKAN</span><h3>Kurirnya pulang.<br>Satu pertanyaan tinggal.</h3><p>Yono selamat. Akses servis dan pengalihan kiriman terbukti. Pengirim foto pertama belum diketahui.</p></div></div><details class="case-timeline"><summary>Urutan kejadian yang berhasil dibuktikan</summary>${caseTimeline.map((e) => `<p><b>${e.time}</b> ${esc(e.detail)}</p>`).join("")}</details><div class="actions"><button id="download-proof" class="primary">Unduh hasil PNG</button><button id="copy-proof" class="secondary">Salin kode verifikasi</button><button id="review-results" class="text-btn">Ulas materi</button></div><p id="copy-status" class="muted" role="status"></p><details><summary>Lihat kode verifikasi</summary><textarea id="proof-code" readonly aria-label="Kode verifikasi hasil">${esc(state!.code)}</textarea><p>Buka <a href="/verify" target="_blank" rel="noopener">halaman verifikasi</a> dan tempel kode ini.</p></details><button id="finish-menu" class="text-btn">Balik ke menu</button>`,
       false,
       true,
+      "result",
     );
     bind("download-proof", () => void downloadProof(r));
     bind("copy-proof", () => {
@@ -1362,6 +1558,8 @@ async function results() {
     modal(
       `${header("HASIL BELUM DIMUAT", "Kasus tetap tersimpan.", false)}<p class="error">${esc((e as Error).message)}</p><button id="retry-result" class="primary">Muat hasil lagi ${icon("arrow", 18)}</button>`,
       false,
+      false,
+      "result",
     );
     bind("retry-result", () => void results());
   }
@@ -1486,7 +1684,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Tab" && modalOpen) {
     const els = Array.from(
       $("dialog-card").querySelectorAll<HTMLElement>(
-        "button:not([disabled]),input:not([disabled]),select,textarea,a[href],summary",
+        'button:not([disabled]),input:not([disabled]),select,textarea,a[href],summary,[tabindex="0"]',
       ),
     );
     const visible = els.filter((el) => el.getClientRects().length > 0);
@@ -1518,6 +1716,7 @@ window.addEventListener("pagehide", () => {
   checkpoint();
   audio.suspend(true);
 });
+motionMedia?.addEventListener?.("change", syncMotionPreference);
 if (reduced) document.documentElement.classList.add("reduced");
 if (location.pathname === "/verify") verifyPage();
 else home();
@@ -1525,6 +1724,9 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has("qa"))
   (window as any).__qa = {
     get state() {
       return state;
+    },
+    get presentation() {
+      return world?.presentationSnapshot?.();
     },
     get audio() {
       return audio.audioStatus();

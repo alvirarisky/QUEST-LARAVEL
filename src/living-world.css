@@ -1,0 +1,494 @@
+/* Pass 2 / stage 2 — existing frame-zero portraits and a quiet, living room. */
+.speaker-portrait {
+  display: block;
+  width: 96px;
+  height: 124px;
+  flex: none;
+  overflow: hidden;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #41524d, #182a27);
+  box-shadow: inset 0 -1px 0 #ffffff1c;
+}
+.unknown-portrait {
+  display: grid;
+  place-items: center;
+  color: #d6e0d6;
+}
+.speaker-portrait image {
+  pointer-events: none;
+}
+.modal[data-mode="dialogue"] {
+  padding: 0 5vw 20px;
+}
+.modal[data-mode="dialogue"] .dialog-card {
+  height: 180px;
+  min-height: 0;
+  max-height: 180px;
+  padding: 16px 22px;
+  overflow: hidden;
+  background: linear-gradient(110deg, #10211ff7, #182c29fa);
+}
+.vn-shell {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 20px;
+  height: 100%;
+  border-left: 2px solid var(--speaker-color, #d5decf);
+  padding-left: 15px;
+}
+.vn-content {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.vn-top {
+  gap: 12px;
+  min-height: 30px;
+}
+.modal[data-mode="dialogue"] .speaker-tab {
+  position: static;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+  font:
+    600 17px Source,
+    sans-serif;
+  color: var(--speaker-color, #e4eadb);
+}
+.modal[data-mode="dialogue"] .vn-top .text-btn {
+  min-height: 30px;
+  padding: 0 4px;
+}
+.modal[data-mode="dialogue"] .dialog-card .vn-text {
+  font: 20px/1.45 var(--serif) !important;
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  margin: 2px 0 3px;
+  padding-right: 7px;
+  color: #f6efdf;
+}
+.vn-bottom {
+  min-height: 32px;
+  gap: 12px;
+}
+.vn-bottom .text-btn {
+  min-height: 32px;
+  padding: 0 4px;
+}
+.vn-key {
+  font-size: 12px;
+}
+.vn-choices {
+  padding-top: 7px;
+  gap: 7px;
+  overflow: auto;
+}
+.vn-choices button {
+  min-height: 44px;
+  padding: 8px 14px;
+  font-size: 16px;
+}
+.narrative-clock {
+  position: absolute;
+  left: 101px;
+  top: 26px;
+  font:
+    15px/1.5 Source,
+    sans-serif;
+  color: #e1e5d8;
+  padding: 2px 10px;
+  border-left: 1px solid #c5d1bd40;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 5px #081411;
+}
+.world-atmosphere {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  overflow: hidden;
+}
+.world-atmosphere i {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.world-vignette {
+  background: radial-gradient(
+    ellipse at 50% 43%,
+    transparent 38%,
+    #0715161a 72%,
+    #030d1042 100%
+  );
+}
+.atmosphere-dust {
+  opacity: 0.18;
+  background-image:
+    radial-gradient(circle, #e9e1be 0 0.8px, transparent 1.6px),
+    radial-gradient(circle, #f4e7bd 0 0.6px, transparent 1.4px);
+  background-size:
+    307px 241px,
+    433px 337px;
+  background-position:
+    43px 100px,
+    170px 30px;
+  animation: room-dust 19s linear infinite;
+}
+.atmosphere-rain {
+  display: none;
+  opacity: 0.095;
+  background-image: repeating-linear-gradient(
+    103deg,
+    transparent 0 53px,
+    #dae8e2 54px,
+    transparent 55px 127px
+  );
+  background-size: 211px 190px;
+  mask-image: linear-gradient(90deg, #000, transparent 55%);
+  animation: window-rain 3.6s linear infinite;
+}
+[data-weather="rain"] .atmosphere-rain {
+  display: block;
+}
+[data-scene="office"] .atmosphere-rain {
+  mask-image: linear-gradient(90deg, #000, transparent 65%);
+}
+.light-haze {
+  display: none;
+  background: radial-gradient(ellipse at 50% 20%, #f5dda87a, transparent 34%);
+  opacity: 0.09;
+}
+[data-scene="service"] .light-haze,
+[data-scene="archive"] .light-haze {
+  display: block;
+  animation: service-light 7.6s ease-in-out infinite;
+}
+@keyframes room-dust {
+  to {
+    background-position:
+      78px 25px,
+      125px -30px;
+  }
+}
+@keyframes window-rain {
+  to {
+    background-position: -28px 190px;
+  }
+}
+@keyframes service-light {
+  0%,
+  100% {
+    opacity: 0.075;
+  }
+  43% {
+    opacity: 0.12;
+  }
+  48% {
+    opacity: 0.08;
+  }
+  53% {
+    opacity: 0.1;
+  }
+  77% {
+    opacity: 0.065;
+  }
+}
+.scene-hotspot[data-kind="person"]:before {
+  width: 21px;
+  height: 21px;
+  border-color: #eed5ad;
+  box-shadow:
+    0 0 13px #f2c78533,
+    inset 0 0 7px #0009;
+}
+.scene-hotspot[data-kind="evidence"]:before {
+  width: 15px;
+  height: 15px;
+  transform: rotate(45deg);
+  border-radius: 3px;
+  border-color: #e0e8dd;
+  background: #102522aa;
+}
+.scene-hotspot[data-kind="evidence"]:after {
+  width: 3px;
+  height: 3px;
+}
+.scene-hotspot[data-kind="evidence"]:hover:before,
+.scene-hotspot[data-kind="evidence"]:focus-visible:before {
+  transform: rotate(45deg) scale(1.15);
+}
+.scene-hotspot[data-kind="decor"]:before {
+  width: 8px;
+  height: 8px;
+  background: #c2cec28c;
+  border: 0;
+  box-shadow: 0 1px 6px #031412bb;
+}
+.scene-hotspot[data-kind="decor"]:after {
+  display: none;
+}
+.scene-hotspot[data-kind="decor"]:hover:before,
+.scene-hotspot[data-kind="decor"]:focus-visible:before {
+  background: #e0e9d7;
+  transform: scale(1.4);
+}
+.object-list [data-object-kind="decor"] {
+  color: #c9d3c9;
+}
+.object-list small {
+  display: block;
+  font-size: 12px;
+  color: #c4cfc2;
+  line-height: 1.5;
+}
+.modal[data-mode="exhibit"] .dialog-card {
+  width: min(820px, 100%);
+}
+.exhibit-stage {
+  display: grid;
+  grid-template-columns: 122px minmax(0, 1fr);
+  align-items: center;
+  gap: 22px;
+}
+.exhibit-witness {
+  background: #11241ff0;
+  border-radius: 8px;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: #eff0e3;
+}
+.exhibit-witness .speaker-portrait {
+  width: 96px;
+  height: 116px;
+}
+.exhibit-witness small {
+  font:
+    12px/1.4 Source,
+    sans-serif;
+  color: #ced7c9;
+}
+.exhibit-witness b {
+  display: block;
+  font:
+    600 17px/1.4 Source,
+    sans-serif;
+  color: var(--speaker-color, #e1e8d7);
+}
+.exhibit-witness span:not(.speaker-portrait) {
+  display: block;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #d0d9ca;
+}
+.exhibit-witness > div {
+  text-align: center;
+}
+.testimony-person {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+.testimony-person .speaker-portrait {
+  width: 80px;
+  height: 102px;
+}
+.testimony-person > div {
+  flex: 1;
+  min-width: 0;
+}
+.testimony-person p {
+  font:
+    14px Source,
+    sans-serif;
+  margin: 0 0 8px;
+  color: #d2dccd;
+}
+.testimony-person .witness-quote {
+  font-size: 20px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: #eee9d7;
+}
+@media (max-width: 1099px) and (min-width: 700px) {
+  .modal[data-mode="dialogue"] {
+    padding-left: 25px;
+    padding-right: 25px;
+  }
+  .vn-shell {
+    gap: 16px;
+  }
+}
+@media (max-width: 699px) {
+  .narrative-clock {
+    left: 67px;
+    top: 23px;
+    font-size: 14px;
+    padding: 0 7px;
+  }
+  .modal[data-mode="dialogue"] {
+    padding: 0 10px 12px;
+  }
+  .modal[data-mode="dialogue"] .dialog-card {
+    height: 222px;
+    min-height: 0;
+    max-height: 222px;
+    padding: 12px 14px;
+  }
+  .vn-shell {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 12px;
+    padding-left: 9px;
+    align-items: start;
+  }
+  .vn-shell > .speaker-portrait {
+    width: 64px;
+    height: 98px;
+    margin-top: 22px;
+  }
+  .modal[data-mode="dialogue"] .speaker-tab {
+    font-size: 16px;
+  }
+  .modal[data-mode="dialogue"] .dialog-card .vn-text {
+    font-size: 18px !important;
+    line-height: 1.42 !important;
+    margin: 3px 0;
+    max-height: none;
+  }
+  .vn-choices button {
+    font-size: 15px;
+    line-height: 1.35;
+    min-height: 48px;
+    padding: 8px 10px;
+  }
+  .vn-top {
+    min-height: 32px;
+  }
+  .vn-bottom {
+    min-height: 36px;
+  }
+  .vn-bottom .text-btn {
+    min-height: 36px;
+    font-size: 15px;
+  }
+  .vn-top .text-btn {
+    font-size: 14px;
+  }
+  .exhibit-stage {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+  .exhibit-witness {
+    flex-direction: row;
+    justify-content: flex-start;
+    padding: 8px 14px;
+    gap: 14px;
+    align-items: center;
+  }
+  .exhibit-witness .speaker-portrait {
+    width: 48px;
+    height: 58px;
+  }
+  .exhibit-witness > div {
+    text-align: left;
+  }
+  .exhibit-witness b {
+    font-size: 16px;
+  }
+  .exhibit-witness span:not(.speaker-portrait) {
+    font-size: 12px;
+  }
+  .testimony-person {
+    gap: 12px;
+  }
+  .testimony-person .speaker-portrait {
+    width: 62px;
+    height: 90px;
+  }
+  .testimony-person .witness-quote {
+    font-size: 18px;
+  }
+  .exhibit-toolbar {
+    margin-bottom: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .atmosphere-rain,
+  .atmosphere-dust,
+  .light-haze {
+    display: none !important;
+  }
+}
+.reduced .atmosphere-rain,
+.reduced .atmosphere-dust,
+.reduced .light-haze,
+.world-reduced .atmosphere-rain,
+.world-reduced .atmosphere-dust,
+.world-reduced .light-haze {
+  display: none !important;
+}
+
+.scene-stage {
+  isolation: isolate;
+}
+.world-tint {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  background: var(--world-tint, #ffefdd);
+}
+/* Opacity-only entry keeps measured feet clear of the dialogue throughout entry. */
+.modal[data-mode="dialogue"] .dialog-card {
+  animation: dialogue-appear 0.18s ease-out;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.modal[data-mode="dialogue"] .vn-top,
+.modal[data-mode="dialogue"] .vn-bottom {
+  min-height: 44px;
+}
+.modal[data-mode="dialogue"] .vn-top .text-btn,
+.modal[data-mode="dialogue"] .vn-bottom .text-btn {
+  min-width: 44px;
+  min-height: 44px;
+}
+@keyframes dialogue-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.vn-text:focus-visible {
+  outline: 2px solid #ffdfa6;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Witness stage directions are narration, without a speaking character label. */
+.vn-shell.is-narration {
+  grid-template-columns: minmax(0, 1fr);
+  border-left: 0;
+  padding-left: 0;
+}
+.modal[data-mode="dialogue"] .dialog-card .vn-text.is-narration {
+  font-style: italic !important;
+  font-synthesis: style;
+}
+.log-narration p {
+  font-style: italic;
+  font-synthesis: style;
+}

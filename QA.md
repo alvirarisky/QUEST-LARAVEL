@@ -48,3 +48,13 @@ Lihat `AUDIT-UX.md` untuk perubahan, sumber referensi resmi, dan batas audit. Du
 - Interaksi keyboard yang diperiksa: drawer mengunci fokus dan mengembalikannya, Escape, panah daftar objek, Spasi efek ketik, Log dialog, kembali dari detail ke papan bukti, audio/gerak tersimpan, lihat ulang ruangan tanpa reset, tooltip serta kunci lantai, dan panel lift ponsel.
 - Sprite, background, suara, font dan aset publik tidak berubah. API, pertanyaan/kunci, model progres, shared types dan konfigurasi routing diperiksa identik terhadap backup baseline.
 - Catatan browser: Chrome sekarang lulus pengujian UI di atas; catatan Chrome belum terverifikasi pada versi 1.1 adalah riwayat pengujian saat itu. Belum ada playtest manusia, pengujian ponsel fisik, atau klaim kompatibilitas seluruh browser. Voice acting penuh tetap tidak tersedia.
+
+
+## Pass kedua — Tahap 1 (15 November 2026)
+
+21 tes dan build produksi lulus. Sebelum/sesudah masing-masing ditamatkan di Chrome lewat Playwright, satu jawaban sengaja salah, skor tetap 87,5. Screenshot 1210×760, 1440×900, 390×844 beserta pemeriksaan bab, fokus, font dan scrim dicatat di `PASS2-STAGE1.md`. Tahap 2–4 menunggu instruksi.
+
+
+## Pass kedua — Tahap 2 (15 November 2026)
+
+27 tes dan build produksi lulus. Baseline, versi baru desktop, dan viewport mobile selesai dengan 87,5 setelah satu soal sengaja salah. Screenshot tiga viewport, framing kaki/flipX, idle ±0,5%, reduced motion, 20 dekor tanpa efek save, jam serta tint diverifikasi lewat Playwright. Lihat `PASS2-STAGE2.md` dan paket screenshot untuk rincian. Tahap 3 belum dikerjakan.

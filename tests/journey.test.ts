@@ -158,7 +158,7 @@ async function app(
     click("dialog-next");
     click("witness-question");
     click("dialog-next");
-    click("follow-lead");
+    act();
     click("begin-analysis");
   };
   return {
@@ -189,9 +189,9 @@ test("A newcomer can finish via the visible primary actions without guessing hid
     (
       a.w.document.querySelector('[data-hotspot="cctv"]') as HTMLButtonElement
     ).click();
-    assert.ok(a.q("required-step"));
-    assert.match(a.q("required-step")!.textContent!, /Allie/);
-    a.click("required-step");
+    assert.ok(a.q("modal")!.hidden);
+    assert.match(a.q("objective")!.textContent!, /Gue/);
+    a.act();
     let ending = false,
       wrongEvidence = false,
       wrongDeduction = false;
@@ -201,12 +201,17 @@ test("A newcomer can finish via the visible primary actions without guessing hid
         ending = true;
         break;
       }
+      if (a.q("modal")!.hidden) {
+        a.act();
+        continue;
+      }
       if (a.q("witness-question")) a.click("witness-question");
       else if (a.q("dialog-next")) a.click("dialog-next");
-      else if (a.q("follow-lead")) a.click("follow-lead");
+      else if (a.q("chapter-skip")) a.click("chapter-skip");
       else if (a.q("begin-analysis")) {
-        assert.match(a.q("dialog-card")!.textContent!, /Yang lo lihat/);
-        assert.match(a.q("dialog-card")!.textContent!, /Kenapa penting/);
+        assert.equal(a.q("modal")!.dataset.mode, "exhibit");
+        assert.ok(a.w.document.querySelector(".physical-exhibit"));
+        assert.doesNotMatch(a.q("dialog-card")!.textContent!, /Kenapa penting/);
         a.click("begin-analysis");
         await a.wait(() => !!a.q("quiz-form"));
       } else if (a.q("quiz-form")) {
@@ -236,12 +241,11 @@ test("A newcomer can finish via the visible primary actions without guessing hid
         await a.wait(() => !!a.q("feedback-next"));
       } else if (a.q("feedback-next")) a.click("feedback-next");
       else if (a.w.document.querySelector("[data-show]")) {
-        const goal = a.q("objective")!.textContent!,
-          proof = goal.includes("Allie")
-            ? "cctv"
-            : goal.includes("Noah")
-              ? "plan"
-              : "access";
+        const proof = !a.saved().flags.allieTruth
+          ? "cctv"
+          : !a.saved().flags.noahTruth
+            ? "plan"
+            : "access";
         if (!wrongEvidence) {
           const before = a.saved().run.answers.length;
           (
@@ -346,6 +350,46 @@ test("Space advances dialogue even when browser focus temporarily falls back to 
     assert.ok(a.q("witness-question"));
     assert.equal(a.saved().run.answers.length, 0);
     assert.equal(a.q("modal")!.dataset.mode, "dialogue");
+  } finally {
+    a.dom.window.close();
+  }
+});
+
+test("Finishing an interview returns to the room with a thought, without a next-step modal", async () => {
+  const a = await app();
+  try {
+    await a.start();
+    a.act();
+    a.click("dialog-next");
+    a.click("witness-question");
+    a.click("dialog-next");
+    assert.ok(a.q("modal")!.hidden);
+    assert.equal(a.q("follow-lead"), null);
+    assert.equal(a.saved().flags.allieBriefed, true);
+    assert.equal(a.saved().run.answers.length, 0);
+    assert.match(a.q("objective")!.textContent!, /Buku tamu/);
+    a.act();
+    assert.equal(a.q("modal")!.dataset.mode, "exhibit");
+  } finally {
+    a.dom.window.close();
+  }
+});
+
+test("Looking at decorative scenery changes no saved game state", async () => {
+  const a = await app();
+  try {
+    await a.start();
+    const before = JSON.stringify(a.saved());
+    a.click("objects-btn");
+    (
+      a.w.document.querySelector(
+        '[data-hotspot="decor-lobby-clock"]',
+      ) as HTMLButtonElement
+    ).click();
+    assert.ok(a.q("modal")!.hidden);
+    assert.equal(JSON.stringify(a.saved()), before);
+    assert.match(a.q("objective")!.textContent!, /Detiknya/);
+    assert.equal(a.q("narrative-clock")!.textContent, "07.42");
   } finally {
     a.dom.window.close();
   }

@@ -66,3 +66,13 @@ Project sudah memiliki fungsi `api/run/*` dan konfigurasi `vercel.json`. Pilih d
 Server memeriksa jawaban dan menandatangani hasil. Backend memakai token stateless tanpa database, sehingga tidak membatasi percobaan baru berdasarkan NIM dan tidak mencegah pemain teknis melakukan replay/rollback token. Ini aktivitas praktikum dengan bukti hasil, bukan sistem proctoring atau penilaian anticurang berisiko tinggi. Nama/NIM/kelas dikirim ke API milik game, lalu tersimpan dalam checkpoint dan kode hasil; jangan menaruh kode hasil di URL publik. Tidak ada analytics atau layanan suara berbayar saat runtime.
 
 Lihat `UI-REDESIGN.md` untuk perubahan visual versi 1.2 dan `AUDIT-UX.md` untuk rincian perubahan pengalaman pemain, `QA.md` untuk pemeriksaan yang sudah dilakukan dan `CREDITS.md` untuk sumber aset.
+
+
+## Pass kedua — Tahap 1
+
+Selesai wawancara kini kembali ke scene dengan monolog, tanpa panel Berikutnya. Pemeriksaan bukti memakai benda yang diperbesar tanpa blur. Serif Source Serif 4 dibundel lokal; perpindahan lokasi memakai kartu bab 1,2 detik yang bisa dilewati klik/Esc. Tahap 2–4 belum dikerjakan. Lihat `PASS2-STAGE1.md` untuk rincian dan batas pemeriksaan.
+
+
+## Pass kedua — Tahap 2
+
+Dialog kini memakai potret frame 0, warna nama, dan framing pasangan agar kaki terlihat. Napas/lean, vignette/debu/hujan, tint lokasi dan variasi lampu servis/arsip menambah suasana. Jam di header adalah fiksi per bab, bukan batas waktu. Empat dekor tiap lokasi hanya memunculkan monolog tanpa efek progres. Reduced motion mengikuti pilihan perangkat maupun pilihan tersimpan. Lihat `PASS2-STAGE2.md`; Tahap 3 belum dimulai.

@@ -1,4 +1,11 @@
 @font-face {
+  font-family: "Source Serif 4";
+  src: url("/fonts/source-serif4-regular.woff2") format("woff2");
+  font-display: swap;
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
   font-family: Source;
   src: url("/fonts/sourcesans3-variable.ttf") format("truetype");
   font-display: swap;
@@ -23,7 +30,7 @@
   --orange: #de785b;
   --line: #a6b8af28;
   --green: #9ec8ac;
-  --serif: Georgia, "Times New Roman", serif;
+  --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
 }
 * {
   box-sizing: border-box;

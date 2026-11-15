@@ -1,7 +1,8 @@
 import Phaser from "phaser";
 import { places, type Place, type Hotspot } from "./story";
 import { sfx } from "./audio";
-import { coverView } from "./scene-layout";
+import { coverView, conversationFrame, dialogueBackdrop } from "./scene-layout";
+import { sceneObjects, isDecoration, sceneLooks } from "./scene-details";
 import { anchors } from "./ui";
 export class Investigation extends Phaser.Scene {
   onReady: () => void = () => {};
@@ -27,7 +28,30 @@ export class Investigation extends Phaser.Scene {
   private focusId?: string;
   private inspectionMove = false;
   private locked = false;
-  reduced = false;
+  private motionReduced = false;
+  private dialogueActive = false;
+  private dialogueScale = 0.65;
+  private lastView?: ReturnType<typeof coverView>;
+  get reduced() {
+    return this.motionReduced;
+  }
+  set reduced(value: boolean) {
+    this.motionReduced = value;
+    if (value) {
+      this.walk?.stop();
+      this.walking = false;
+      this.inspectionMove = false;
+      this.player?.setFrame(0);
+    }
+    this.htmlParent
+      ?.closest(".cinema-game")
+      ?.classList.toggle("world-reduced", value);
+    if (this.player) {
+      this.resizeView();
+      this.pose(this.time?.now || 0);
+    }
+  }
+
   private progress = 0;
   private indicator?: Phaser.GameObjects.Text;
   constructor() {
@@ -65,7 +89,7 @@ export class Investigation extends Phaser.Scene {
       .setScale(0.76)
       .setDepth(30);
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
-      if (!this.locked && p.y > 670) this.move(p.x);
+      if (!this.locked && p.worldY > 670) this.move(p.worldX);
     });
     this.loadPlace("lobby");
     this.resizeView();
@@ -76,6 +100,15 @@ export class Investigation extends Phaser.Scene {
     this.walk?.stop();
     this.walking = false;
     this.place = id;
+    this.speaker = undefined;
+    this.dialogueActive = false;
+    const root = this.htmlParent?.closest(".cinema-game") as HTMLElement | null;
+    if (root) {
+      root.dataset.scene = id;
+      root.dataset.weather = sceneLooks[id].weather;
+      root.classList.toggle("world-reduced", this.reduced);
+    }
+
     this.background.setTexture(places[id].image).setDisplaySize(1600, 900);
     this.actors.forEach((a) => a.destroy());
     this.hotspots.forEach((h) => h.destroy());
@@ -85,7 +118,7 @@ export class Investigation extends Phaser.Scene {
     this.hotspots = [];
     this.player.setPosition(170, 840).setFrame(0);
     this.focusId = undefined;
-    for (const h of places[id].hotspots) {
+    for (const h of sceneObjects(id)) {
       if (h.person) {
         const actor = this.add
           .sprite(h.x, 790, h.person, 0)
@@ -107,13 +140,15 @@ export class Investigation extends Phaser.Scene {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "scene-hotspot";
+      button.dataset.kind = isDecoration(h)
+        ? "decor"
+        : h.person
+          ? "person"
+          : "evidence";
       button.dataset.sceneObject = h.id;
       button.setAttribute(
         "aria-label",
-        `${h.person ? "Parler avec" : "Periksa"} ${h.label}`.replace(
-          "Parler avec",
-          "Tanya",
-        ),
+        `${h.person ? "Tanya" : isDecoration(h) ? "Lihat" : "Periksa"} ${h.label}`,
       );
       button.dataset.anchor = anchors[h.id] || "above";
       const label = document.createElement("span");
@@ -152,7 +187,9 @@ export class Investigation extends Phaser.Scene {
         .text(544, 399, n >= 8 ? "Akses aktif" : "Terkunci", {
           fontFamily: "Source, sans-serif",
           fontSize: "16px",
-          color: n >= 8 ? "#a4d2b0" : "#d2ad78",
+          color: n >= 8 ? "#d1e2c0" : "#dce7d4",
+          backgroundColor: "#0d201deb",
+          padding: { x: 8, y: 4 },
         })
         .setOrigin(0.5)
         .setDepth(4);
@@ -174,16 +211,19 @@ export class Investigation extends Phaser.Scene {
   }
   setSpeaker(person?: string) {
     this.speaker = person;
+    this.dialogueActive = !!this.htmlParent?.closest(".in-dialogue");
+    if (this.dialogueActive) {
+      this.walk?.stop();
+      this.walking = false;
+      this.inspectionMove = false;
+      this.player?.setFrame(0);
+    }
     this.resizeView();
-    this.actorByPerson.forEach((actor, key) => {
-      const active = key === person;
-      actor.setAlpha(person && !active ? 0.65 : 1);
-      actor.setScale((key === "wiwo" ? 0.68 : 0.7) * (active ? 1.025 : 1));
-    });
-    this.layer?.classList.toggle("speaking", !!person);
+    this.pose(this.time?.now || 0);
+    this.layer?.classList.toggle("speaking", this.dialogueActive);
   }
   private resizeView() {
-    if (!this.background) return;
+    if (!this.background || !this.player) return;
     const w = this.scale.width,
       h = this.scale.height;
     const focal: Record<Place, number> = {
@@ -193,27 +233,120 @@ export class Investigation extends Phaser.Scene {
       service: 800,
       archive: 850,
     };
-    const target = places[this.place].hotspots.find(
-      (h) => h.id === (this.speaker || this.focusId),
+    const all = sceneObjects(this.place);
+    const target = all.find(
+      (o) =>
+        (this.speaker && o.person === this.speaker) || o.id === this.focusId,
     );
-    const v = coverView(w, h, w < 700 && target ? target.x : focal[this.place]);
+    const person =
+      places[this.place].hotspots.find((o) => o.person === this.speaker) ||
+      places[this.place].hotspots.find((o) => o.person);
+    let v = coverView(w, h, w < 700 && target ? target.x : focal[this.place]);
+    if (this.dialogueActive && person) {
+      const card = document.getElementById("dialog-card");
+      const top =
+        card?.getBoundingClientRect().top || h - (w < 700 ? 238 : 200);
+      const frame = conversationFrame(w, h, person.x, top);
+      v = frame.view;
+      this.dialogueScale = frame.scale;
+      const backdrop = dialogueBackdrop(
+        frame.feetY,
+        sceneLooks[this.place].floorY,
+        frame.center,
+      );
+      this.background
+        .setDisplaySize(1600 * backdrop.zoom, 900 * backdrop.zoom)
+        .setPosition(backdrop.x, backdrop.y);
+      this.player
+        .setPosition(frame.playerX, frame.feetY)
+        .setFlipX(frame.playerX > person.x);
+      this.actorByPerson.forEach((actor, key) => {
+        actor.setY(frame.feetY);
+        actor.setFlipX(this.player.x < actor.x);
+        actor.setAlpha(key === person.person ? 1 : 0.45);
+      });
+    } else {
+      this.background.setDisplaySize(1600, 900).setPosition(800, 450);
+      this.player.setY(840);
+      this.actorByPerson.forEach((actor) =>
+        actor
+          .setY(790)
+          .setAlpha(1)
+          .setFlipX(this.player.x < actor.x),
+      );
+    }
+    this.lastView = v;
     this.cameras.main
       .setZoom(v.zoom)
       .setScroll(v.left + (w / v.zoom - w) / 2, v.top + (h / v.zoom - h) / 2);
     this.layer
       ?.querySelectorAll<HTMLButtonElement>("[data-scene-object]")
       .forEach((b) => {
-        const hs = places[this.place].hotspots.find(
-          (x) => x.id === b.dataset.sceneObject,
-        )!;
+        const hs = all.find((o) => o.id === b.dataset.sceneObject)!;
         const p = v.project(hs.x, hs.y);
         b.style.left = `${(p.x / w) * 100}%`;
         b.style.top = `${(p.y / h) * 100}%`;
         b.hidden = p.x < 22 || p.x > w - 22 || p.y < 75 || p.y > h - 45;
-        const anchor = anchors[hs.id] || "above";
+        const anchor = anchors[hs.id] || (isDecoration(hs) ? "below" : "above");
         b.dataset.anchor =
           p.x < 135 ? "right" : p.x > w - 135 ? "left" : anchor;
       });
+    this.pose(this.time?.now || 0);
+  }
+  private pose(time: number) {
+    if (!this.player) return;
+    const base = this.dialogueActive ? this.dialogueScale : 0.76;
+    const breath = this.reduced ? 0 : Math.sin(time / 1050) * 0.005;
+    this.player
+      .setScale(base, base * (1 + breath))
+      .setRotation(
+        this.reduced || this.walking ? 0 : Math.sin(time / 1900) * 0.003,
+      );
+    let index = 0;
+    this.actorByPerson.forEach((actor, key) => {
+      const active = this.dialogueActive && key === this.speaker;
+      const scale = this.dialogueActive
+        ? this.dialogueScale
+        : key === "wiwo"
+          ? 0.68
+          : 0.7;
+      const air = this.reduced
+        ? 0
+        : Math.sin(time / 1050 + ++index * 1.7) * 0.005;
+      actor.setScale(scale, scale * (1 + air));
+      actor.setRotation(
+        this.reduced
+          ? 0
+          : active
+            ? this.player.x < actor.x
+              ? -0.016
+              : 0.016
+            : 0,
+      );
+      actor.setFlipX(this.player.x < actor.x);
+    });
+  }
+  presentationSnapshot() {
+    const view = this.lastView;
+    const sample = (s: Phaser.GameObjects.Sprite) => ({
+      x: s.x,
+      y: s.y,
+      scaleX: s.scaleX,
+      scaleY: s.scaleY,
+      rotation: s.rotation,
+      flipX: s.flipX,
+      feet: view?.project(s.x, s.y),
+    });
+    return {
+      place: this.place,
+      reduced: this.reduced,
+      dialogue: this.dialogueActive,
+      player: this.player && sample(this.player),
+      actors: Object.fromEntries(
+        [...this.actorByPerson].map(([key, s]) => [key, sample(s)]),
+      ),
+      tint: sceneLooks[this.place].tint,
+    };
   }
   inspect(h: Hotspot) {
     this.coachSeen = true;
@@ -223,16 +356,44 @@ export class Investigation extends Phaser.Scene {
     this.layer
       ?.querySelectorAll(".coach")
       .forEach((b) => b.classList.remove("coach"));
+    if (isDecoration(h)) {
+      this.onInspect(h);
+      return;
+    }
     this.inspectionMove = true;
-    this.move(h.x < 320 ? h.x + 80 : h.x - 95);
+    this.move(
+      h.person
+        ? h.x > 400
+          ? h.x - 300
+          : h.x + 300
+        : h.x < 320
+          ? h.x + 80
+          : h.x - 140,
+    );
     this.onInspect(h);
   }
 
   move(x: number, after?: () => void) {
     this.walk?.stop();
     this.player.setFrame(0);
-    const target = Phaser.Math.Clamp(x, 80, 1510),
-      distance = Math.abs(target - this.player.x);
+    let target = Phaser.Math.Clamp(x, 80, 1510);
+    for (const actor of this.actorByPerson.values())
+      if (Math.abs(target - actor.x) < 200)
+        target = Phaser.Math.Clamp(
+          actor.x > 400 ? actor.x - 260 : actor.x + 260,
+          80,
+          1510,
+        );
+    const distance = Math.abs(target - this.player.x);
+    if (this.reduced) {
+      const left = target < this.player.x;
+      this.player.setX(target).setFlipX(left);
+      this.walking = false;
+      this.inspectionMove = false;
+      this.pose(this.time?.now || 0);
+      after?.();
+      return;
+    }
     this.player.setFlipX(target < this.player.x);
     if (distance < 12) {
       this.inspectionMove = false;
@@ -271,6 +432,7 @@ export class Investigation extends Phaser.Scene {
     return this.highlighted;
   }
   update(time: number) {
+    this.pose(time);
     if (this.walking) {
       if (time > this.animAt) {
         this.player.setFrame(Number(this.player.frame.name) === 1 ? 2 : 1);
@@ -304,6 +466,8 @@ export function createWorld(
     scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
     render: { antialias: true, pixelArt: false },
     audio: { noAudio: true },
+    // DOM hotspots own their clicks; do not replay them through canvas actors.
+    input: { windowEvents: false },
     banner: false,
   });
   return { game, scene };

@@ -1,0 +1,413 @@
+/* Pass 2 / stage 1: the room stays present between distinct story moments. */
+.modal {
+  backdrop-filter: none !important;
+}
+.scene-objective.detective-thought {
+  font: 18px/1.5 var(--serif);
+  color: #f6e8cd;
+  max-width: min(720px, calc(100% - 64px));
+}
+.scene-objective.detective-thought:before {
+  content: "Gue · ";
+  font:
+    14px Source,
+    sans-serif;
+  color: #c8d1c3;
+}
+.cinema-game.exhibit-open .scene-objective {
+  opacity: 1;
+  z-index: 110;
+}
+.cinema-landing .title-block h1 {
+  line-height: 1.07;
+  letter-spacing: -2px;
+  margin: 0 0 34px;
+  font-weight: 400;
+}
+.cinema-landing .title-block h1 em {
+  display: inline-block;
+  padding-bottom: 0.12em;
+}
+.cinema-landing .title-block .tagline {
+  margin-top: 0;
+  line-height: 1.55;
+  clear: both;
+}
+.dialog-card .vn-text {
+  font-family: var(--serif) !important;
+  font-weight: 400 !important;
+  line-height: 1.6 !important;
+}
+.intro-copy h1 {
+  line-height: 1.12;
+  letter-spacing: -1px;
+}
+.modal[data-mode="exhibit"] {
+  padding: 148px 32px 25px;
+  background: #07141368;
+  align-items: center;
+  justify-content: center;
+}
+.modal[data-mode="exhibit"] .dialog-card {
+  width: min(620px, 100%);
+  max-height: calc(100svh - 173px);
+  padding: 10px 25px 18px;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  overflow: auto;
+  animation: object-in 0.2s ease-out;
+}
+.exhibit-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  background: #10221fef;
+  padding: 3px 10px 3px 17px;
+  border-radius: 8px;
+}
+.exhibit-toolbar p {
+  margin: 0;
+  font:
+    14px Source,
+    sans-serif !important;
+  color: #dbe3d8 !important;
+  line-height: 1.4 !important;
+}
+.physical-exhibit {
+  position: relative;
+  padding: 28px 32px;
+  transform: rotate(-1.3deg);
+  background: linear-gradient(140deg, #ede8d8, #d9d2ba);
+  color: #20312b;
+  box-shadow: 0 18px 50px #0008;
+  isolation: isolate;
+}
+.physical-exhibit:after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 25px,
+    #6b70550a 26px
+  );
+}
+.physical-exhibit h2 {
+  font: 28px/1.2 var(--serif);
+  color: #20312b;
+  margin: 5px 0 20px;
+  font-weight: 400;
+}
+.physical-exhibit blockquote {
+  font: 23px/1.5 var(--serif);
+  color: #182c26;
+  margin: 0 0 18px;
+  padding: 0;
+  border: 0;
+  font-weight: 400;
+}
+.physical-exhibit .exhibit-description {
+  font:
+    16px/1.7 Source,
+    sans-serif !important;
+  color: #293d33 !important;
+  margin: 0 0 20px;
+}
+.exhibit-object-mark {
+  float: right;
+  margin: 0 -5px 8px 15px;
+}
+.exhibit-object-mark .prop {
+  display: block;
+  width: 90px;
+  height: 90px;
+}
+.exhibit-paper:before {
+  content: "";
+  position: absolute;
+  width: 94px;
+  height: 25px;
+  top: -10px;
+  left: 38%;
+  background: #b5b39ac9;
+  transform: rotate(2deg);
+  box-shadow: 0 1px 2px #0002;
+}
+.exhibit-screen {
+  border-radius: 24px;
+  border: 8px solid #52605a;
+  background: linear-gradient(120deg, #233b35, #152c27);
+  color: #edf0dd;
+  transform: rotate(1deg);
+  padding: 28px;
+}
+.exhibit-screen h2 {
+  color: #eef0de;
+}
+.exhibit-screen blockquote {
+  background: #e4e8d4;
+  color: #1e3227;
+  padding: 17px 20px;
+  border-radius: 14px 14px 14px 2px;
+  font-size: 23px;
+}
+.exhibit-screen .exhibit-description {
+  color: #e1e9d9 !important;
+}
+.exhibit-screen .exhibit-object-mark {
+  float: none;
+  margin: 0 0 8px;
+}
+.exhibit-screen .exhibit-object-mark .prop {
+  width: 72px;
+  height: 72px;
+  margin: auto;
+}
+.exhibit-parcel {
+  background: linear-gradient(120deg, #ddc8a3, #c4ae87);
+  border-top: 14px solid #9c805a;
+  transform: rotate(0.8deg);
+}
+.exhibit-key .exhibit-object-mark {
+  float: none;
+  margin: 0 auto 10px;
+}
+.exhibit-key .exhibit-object-mark .prop {
+  width: 150px;
+  height: 150px;
+  margin: auto;
+}
+.exhibit-analysis {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding-top: 20px;
+  border-top: 1px solid #62705a66;
+  margin-top: 18px;
+  clear: both;
+}
+.exhibit-analysis > span {
+  font:
+    14px Source,
+    sans-serif;
+  color: #334b3a;
+}
+.exhibit-screen .exhibit-analysis > span {
+  color: #dce6d7;
+}
+.exhibit-analysis .primary {
+  white-space: nowrap;
+  min-height: 48px;
+}
+.exhibit-return {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  background: #10221fec;
+  margin: 20px auto 0;
+  padding: 12px 20px;
+  border-radius: 8px;
+  color: #e8ead9;
+  font-size: 15px;
+}
+.modal[data-mode="analysis"] {
+  justify-content: flex-end;
+  align-items: stretch;
+  padding: 0;
+  background: #07141366;
+}
+.modal[data-mode="analysis"] .dialog-card {
+  width: min(620px, 56vw);
+  height: 100svh;
+  max-height: 100svh;
+  border-radius: 8px 0 0 8px;
+  box-shadow: -12px 0 50px #0006;
+  animation: drawer-in 0.2s ease-out;
+}
+.modal[data-mode="chapter"] {
+  padding: 0;
+  background: #030909;
+  animation: chapter-in 0.18s ease-out;
+  z-index: 160;
+}
+.modal[data-mode="chapter"] .dialog-card {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  width: 100%;
+  max-height: 100svh;
+  border-radius: 0;
+  animation: none;
+}
+.chapter-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  width: 100%;
+  min-height: 100svh;
+  padding: 8vw;
+  color: #f3eddf;
+  background: transparent;
+  border: 0;
+  text-align: center;
+  border-radius: 0;
+}
+.chapter-card > span {
+  font:
+    16px Source,
+    sans-serif;
+  color: #c3cbbf;
+}
+.chapter-card h2 {
+  font: clamp(38px, 5vw, 70px)/1.15 var(--serif);
+  margin: 0;
+  max-width: 1000px;
+  font-weight: 400;
+}
+.chapter-card p {
+  font:
+    18px Source,
+    sans-serif !important;
+  color: #cdd5c7 !important;
+  margin: 0;
+}
+.chapter-card small {
+  font:
+    12px Source,
+    sans-serif;
+  margin-top: 30px;
+  color: #c5cebf;
+}
+@keyframes object-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes chapter-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (max-width: 1099px) and (min-width: 700px) {
+  .modal[data-mode="analysis"] .dialog-card {
+    width: min(620px, 70vw);
+  }
+}
+@media (max-width: 699px) {
+  .scene-objective.detective-thought {
+    font-size: 16px;
+    max-width: calc(100% - 36px);
+  }
+  .scene-objective.detective-thought:before {
+    font-size: 12px;
+  }
+  .modal[data-mode="exhibit"] {
+    padding: 205px 14px 14px;
+    align-items: flex-end;
+  }
+  .modal[data-mode="exhibit"] .dialog-card {
+    max-height: calc(100svh - 220px);
+    padding: 7px 9px 14px;
+  }
+  .physical-exhibit {
+    padding: 22px 24px;
+    transform: rotate(-0.8deg);
+  }
+  .physical-exhibit h2 {
+    font-size: 25px;
+    margin-bottom: 14px;
+  }
+  .physical-exhibit blockquote {
+    font-size: 20px;
+    line-height: 1.45;
+  }
+  .exhibit-object-mark .prop {
+    width: 70px;
+    height: 70px;
+  }
+  .exhibit-screen {
+    padding: 20px;
+    border-width: 5px;
+  }
+  .exhibit-screen blockquote {
+    font-size: 20px;
+    padding: 15px;
+  }
+  .exhibit-screen .exhibit-object-mark .prop {
+    height: 60px;
+    width: 60px;
+  }
+  .exhibit-analysis {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 14px;
+    margin-top: 14px;
+  }
+  .exhibit-toolbar {
+    margin-bottom: 14px;
+  }
+  .exhibit-toolbar p {
+    font-size: 12px !important;
+  }
+  .modal[data-mode="analysis"] {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .modal[data-mode="analysis"] .dialog-card {
+    width: 100%;
+    height: auto;
+    max-height: 85svh;
+    border-radius: 14px 14px 0 0;
+    padding: 24px 22px;
+  }
+  .cinema-landing .title-block h1 {
+    line-height: 1.1;
+    margin-bottom: 23px;
+  }
+  .cinema-landing .title-block .tagline {
+    font-size: 20px;
+  }
+  .chapter-card {
+    padding: 36px 22px;
+  }
+  .chapter-card h2 {
+    font-size: 38px;
+  }
+  .chapter-card > span {
+    font-size: 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal[data-mode="exhibit"] .dialog-card,
+  .modal[data-mode="chapter"],
+  .modal[data-mode="analysis"] .dialog-card {
+    animation: none;
+  }
+  .physical-exhibit {
+    transform: none;
+  }
+}
+.reduced .physical-exhibit {
+  transform: none;
+}
