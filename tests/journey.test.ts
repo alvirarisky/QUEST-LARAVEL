@@ -153,9 +153,14 @@ async function app(
       ).click();
     }
   };
+  // Witness intros are several lines (speech + narration); advance until the question appears.
+  const toQuestion = () => {
+    for (let i = 0; i < 8 && !q("witness-question") && q("dialog-next"); i++)
+      click("dialog-next");
+  };
   const firstAnalysis = () => {
     act();
-    click("dialog-next");
+    toQuestion();
     click("witness-question");
     click("dialog-next");
     act();
@@ -163,6 +168,7 @@ async function app(
   };
   return {
     act,
+    toQuestion,
     firstAnalysis,
     w,
     dom,
@@ -340,13 +346,14 @@ test("Space advances dialogue even when browser focus temporarily falls back to 
   try {
     await a.start();
     a.act();
-    a.w.document.body.dispatchEvent(
-      new a.w.KeyboardEvent("keydown", {
-        key: " ",
-        bubbles: true,
-        cancelable: true,
-      }),
-    );
+    for (let i = 0; i < 8 && !a.q("witness-question"); i++)
+      a.w.document.body.dispatchEvent(
+        new a.w.KeyboardEvent("keydown", {
+          key: " ",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
     assert.ok(a.q("witness-question"));
     assert.equal(a.saved().run.answers.length, 0);
     assert.equal(a.q("modal")!.dataset.mode, "dialogue");
@@ -360,7 +367,7 @@ test("Finishing an interview returns to the room with a thought, without a next-
   try {
     await a.start();
     a.act();
-    a.click("dialog-next");
+    a.toQuestion();
     a.click("witness-question");
     a.click("dialog-next");
     assert.ok(a.q("modal")!.hidden);
